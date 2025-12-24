@@ -13,7 +13,6 @@ LIB_DIR="$(dirname "$SCRIPT_DIR")"
 source "${LIB_DIR}/core/logger.sh"
 
 readonly REPORT_DIR="/var/vps-provision/reports"
-readonly SESSION_DIR="/var/vps-provision/sessions"
 
 # Generate JSON summary report
 generate_summary_report() {

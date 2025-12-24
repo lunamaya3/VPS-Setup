@@ -25,11 +25,10 @@ display_ready_banner() {
   local dev_password="${2:-[Generated - see logs]}"
   
   # Get system information
-  local hostname ip_address rdp_port ssh_port
+  local hostname ip_address rdp_port
   hostname=$(hostname)
   ip_address=$(hostname -I | awk '{print $1}' || echo "unknown")
   rdp_port="3389"
-  ssh_port="22"
   
   # Calculate total duration
   local duration
