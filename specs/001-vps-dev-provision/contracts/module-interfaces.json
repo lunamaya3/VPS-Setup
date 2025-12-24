@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VPS Provision Module Interfaces Contract",
+  "description": "Contract specifications for individual provisioning module commands",
+  "version": "1.0.0",
+
+  "modules": {
+    "vps-provision-module": {
+      "description": "Run individual provisioning modules independently",
+      "command": "vps-provision-module",
+      "usage": "vps-provision-module <module-name> [OPTIONS]",
+
+      "available_modules": {
+        "system-prep": {
+          "description": "System updates and base package installation",
+          "actions": [
+            "Update APT package lists",
+            "Upgrade existing packages",
+            "Install build-essential, curl, wget, git",
+            "Configure unattended-upgrades for security updates"
+          ],
+          "estimated_duration": "3-5 minutes",
+          "dependencies": "None (first module to run)"
+        },
+
+        "desktop-install": {
+          "description": "Install and configure XFCE desktop environment",
+          "actions": [
+            "Install task-xfce-desktop and xfce4-goodies",
+            "Configure LightDM display manager",
+            "Set XFCE as default desktop session",
+            "Apply custom XFCE configurations"
+          ],
+          "estimated_duration": "4-6 minutes",
+          "dependencies": ["system-prep"]
+        },
+
+        "rdp-config": {
+          "description": "Install and configure xrdp server",
+          "actions": [
+            "Install xrdp package",
+            "Generate TLS certificates",
+            "Configure xrdp.ini for multi-session support",
+            "Enable and start xrdp service",
+            "Configure firewall rules for port 3389"
+          ],
+          "estimated_duration": "1-2 minutes",
+          "dependencies": ["desktop-install"]
+        },
+
+        "user-creation": {
+          "description": "Create developer user account with privileges",
+          "actions": [
+            "Create devusers group",
+            "Create user account with specified username",
+            "Generate strong random password",
+            "Configure passwordless sudo",
+            "Add user to required groups (sudo, audio, video, dialout, plugdev)",
+            "Set password expiration for first login",
+            "Copy SSH keys if available"
+          ],
+          "estimated_duration": "30 seconds",
+          "dependencies": ["system-prep"],
+          "options": {
+            "--username": {
+              "description": "Custom username for developer account",
+              "type": "string",
+              "default": "devuser"
+            }
+          }
+        },
+
+        "ide-vscode": {
+          "description": "Install Visual Studio Code",
+          "actions": [
+            "Add Microsoft GPG key",
+            "Add VSCode repository to APT sources",
+            "Update package lists",
+            "Install code package",
+            "Verify installation and create command alias"
+          ],
+          "estimated_duration": "2-3 minutes",
+          "dependencies": ["system-prep", "desktop-install"]
+        },
+
+        "ide-cursor": {
+          "description": "Install Cursor IDE",
+          "actions": [
+            "Download latest Cursor .deb package or AppImage",
+            "Install .deb package or extract AppImage to /opt/cursor",
+            "Create desktop launcher",
+            "Verify installation"
+          ],
+          "estimated_duration": "2-3 minutes",
+          "dependencies": ["system-prep", "desktop-install"]
+        },
+
+        "ide-antigravity": {
+          "description": "Install Antigravity IDE",
+          "actions": [
+            "Fetch latest AppImage from GitHub releases",
+            "Extract to /opt/antigravity",
+            "Set executable permissions",
+            "Create desktop launcher",
+            "Verify installation"
+          ],
+          "estimated_duration": "2-3 minutes",
+          "dependencies": ["system-prep", "desktop-install"]
+        },
+
+        "terminal-setup": {
+          "description": "Configure terminal with git aliases and colored prompt",
+          "actions": [
+            "Install bash-completion",
+            "Add git aliases to /etc/skel/.bashrc",
+            "Configure colored prompt with git branch display",
+            "Apply to existing user accounts"
+          ],
+          "estimated_duration": "15-30 seconds",
+          "dependencies": ["system-prep", "user-creation"]
+        },
+
+        "dev-tools": {
+          "description": "Install common development utilities",
+          "actions": [
+            "Install build-essential (gcc, g++, make)",
+            "Install git and configure defaults",
+            "Install language runtimes (python3, nodejs if specified)",
+            "Install version control tools"
+          ],
+          "estimated_duration": "2-3 minutes",
+          "dependencies": ["system-prep"]
+        },
+
+        "verification": {
+          "description": "Post-installation validation and health checks",
+          "actions": [
+            "Verify RDP service is running and accessible",
+            "Test each IDE launches without error",
+            "Verify developer user can execute sudo commands",
+            "Check file permissions and configurations",
+            "Generate installation summary report"
+          ],
+          "estimated_duration": "30-60 seconds",
+          "dependencies": ["All previous modules"]
+        }
+      },
+
+      "common_options": {
+        "--dry-run": {
+          "description": "Show planned actions without executing",
+          "type": "flag"
+        },
+        "--force": {
+          "description": "Run even if checkpoint exists",
+          "type": "flag"
+        },
+        "--log-level": {
+          "description": "Set logging verbosity",
+          "type": "choice",
+          "choices": ["DEBUG", "INFO", "WARNING", "ERROR"],
+          "default": "INFO"
+        },
+        "--no-checkpoint": {
+          "description": "Don't create checkpoint file after completion",
+          "type": "flag"
+        }
+      },
+
+      "exit_codes": {
+        "0": "Module completed successfully",
+        "1": "Module execution failed",
+        "2": "Dependency module not completed (checkpoint missing)",
+        "3": "Module validation failed (prerequisites not met)"
+      },
+
+      "examples": [
+        {
+          "description": "Run desktop installation module only",
+          "command": "vps-provision-module desktop-install",
+          "expected_behavior": "Installs XFCE desktop environment"
+        },
+        {
+          "description": "Install VSCode with debug logging",
+          "command": "vps-provision-module ide-vscode --log-level DEBUG",
+          "expected_behavior": "Installs VSCode with detailed output"
+        },
+        {
+          "description": "Create custom user account",
+          "command": "vps-provision-module user-creation --username alice",
+          "expected_behavior": "Creates 'alice' account with developer privileges"
+        },
+        {
+          "description": "Dry run verification",
+          "command": "vps-provision-module verification --dry-run",
+          "expected_behavior": "Shows validation checks without executing"
+        }
+      ]
+    }
+  }
+}

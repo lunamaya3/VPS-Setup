@@ -1,0 +1,387 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VPS Provision Validation Interface Contract",
+  "description": "Contract specification for verification and health-check commands",
+  "version": "1.0.0",
+
+  "commands": {
+    "vps-provision-verify": {
+      "description": "Verify provisioning completion and system health",
+      "usage": "vps-provision-verify [OPTIONS]",
+
+      "purpose": "Run comprehensive validation checks to ensure all provisioning components are correctly installed, configured, and functional",
+
+      "validation_checks": [
+        {
+          "check_id": "os-version",
+          "description": "Verify OS is Debian 13",
+          "critical": true,
+          "validation": "Check /etc/os-release for Debian version 13"
+        },
+        {
+          "check_id": "resources",
+          "description": "Verify sufficient system resources",
+          "critical": true,
+          "validation": "RAM >= 2GB, Disk available >= 5GB"
+        },
+        {
+          "check_id": "desktop-installed",
+          "description": "Verify XFCE desktop environment installed",
+          "critical": true,
+          "validation": "Check for xfce4-session executable"
+        },
+        {
+          "check_id": "rdp-service",
+          "description": "Verify xrdp service running",
+          "critical": true,
+          "validation": "systemctl is-active xrdp returns 0"
+        },
+        {
+          "check_id": "rdp-port",
+          "description": "Verify RDP port 3389 is accessible",
+          "critical": true,
+          "validation": "netstat shows listening on port 3389"
+        },
+        {
+          "check_id": "user-exists",
+          "description": "Verify developer user account exists",
+          "critical": true,
+          "validation": "id devuser (or specified username) returns 0"
+        },
+        {
+          "check_id": "user-groups",
+          "description": "Verify user has required group memberships",
+          "critical": true,
+          "validation": "User is member of: sudo, audio, video, dialout, plugdev"
+        },
+        {
+          "check_id": "sudo-access",
+          "description": "Verify user has passwordless sudo",
+          "critical": true,
+          "validation": "Check /etc/sudoers.d/devusers for NOPASSWD config"
+        },
+        {
+          "check_id": "vscode-installed",
+          "description": "Verify VSCode is installed and functional",
+          "critical": false,
+          "validation": "which code returns 0, code --version executes successfully"
+        },
+        {
+          "check_id": "cursor-installed",
+          "description": "Verify Cursor IDE is installed and functional",
+          "critical": false,
+          "validation": "Cursor executable exists, launches without error"
+        },
+        {
+          "check_id": "antigravity-installed",
+          "description": "Verify Antigravity IDE is installed and functional",
+          "critical": false,
+          "validation": "Antigravity executable exists, launches without error"
+        },
+        {
+          "check_id": "git-installed",
+          "description": "Verify Git is installed and configured",
+          "critical": false,
+          "validation": "git --version returns 0"
+        },
+        {
+          "check_id": "terminal-config",
+          "description": "Verify terminal customizations applied",
+          "critical": false,
+          "validation": "Check .bashrc for git aliases and colored prompt"
+        },
+        {
+          "check_id": "firewall-rules",
+          "description": "Verify firewall allows SSH and RDP",
+          "critical": false,
+          "validation": "ufw status shows rules for ports 22 and 3389"
+        },
+        {
+          "check_id": "ssh-hardening",
+          "description": "Verify SSH security configurations",
+          "critical": false,
+          "validation": "PermitRootLogin is prohibit-password or no"
+        }
+      ],
+
+      "options": {
+        "--verbose, -v": {
+          "description": "Show detailed output for each check",
+          "type": "flag",
+          "required": false
+        },
+        "--check": {
+          "description": "Run only specific check(s)",
+          "type": "multi-value",
+          "required": false,
+          "valid_values": [
+            "os-version",
+            "resources",
+            "desktop-installed",
+            "rdp-service",
+            "rdp-port",
+            "user-exists",
+            "user-groups",
+            "sudo-access",
+            "vscode-installed",
+            "cursor-installed",
+            "antigravity-installed",
+            "git-installed",
+            "terminal-config",
+            "firewall-rules",
+            "ssh-hardening"
+          ],
+          "example": "vps-provision-verify --check rdp-service --check vscode-installed"
+        },
+        "--critical-only": {
+          "description": "Run only critical checks",
+          "type": "flag",
+          "required": false,
+          "behavior": "Runs checks marked as critical: true"
+        },
+        "--output-format": {
+          "description": "Output format for results",
+          "type": "choice",
+          "choices": ["text", "json"],
+          "default": "text",
+          "required": false
+        },
+        "--fix": {
+          "description": "Attempt to fix failed checks automatically (experimental)",
+          "type": "flag",
+          "required": false,
+          "warning": "May make system modifications"
+        }
+      },
+
+      "exit_codes": {
+        "0": "All checks passed",
+        "1": "One or more non-critical checks failed",
+        "2": "One or more critical checks failed",
+        "3": "Unable to run verification (permission denied, missing tools)"
+      },
+
+      "output_schema": {
+        "text_format": {
+          "structure": [
+            "Header with verification timestamp",
+            "Check results (✓ pass, ✗ fail, ⚠ warning)",
+            "Summary: X/Y checks passed (Z critical)",
+            "Failure details if any",
+            "Recommendations for failed checks"
+          ],
+          "example": "See below for example output"
+        },
+        "json_format": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "verification_time": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "overall_status": {
+                "type": "string",
+                "enum": ["PASS", "WARNING", "FAIL"]
+              },
+              "checks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "check_id": { "type": "string" },
+                    "description": { "type": "string" },
+                    "critical": { "type": "boolean" },
+                    "status": {
+                      "type": "string",
+                      "enum": ["PASS", "FAIL", "WARNING", "SKIP"]
+                    },
+                    "message": { "type": "string" },
+                    "fix_suggestion": { "type": "string", "nullable": true }
+                  }
+                }
+              },
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "total_checks": { "type": "integer" },
+                  "passed": { "type": "integer" },
+                  "failed": { "type": "integer" },
+                  "critical_failed": { "type": "integer" }
+                }
+              }
+            }
+          }
+        }
+      },
+
+      "example_text_output": "VPS Provisioning Verification\n==============================\nTimestamp: 2025-12-23 10:45:00\n\nRunning validation checks...\n\n✓ OS Version: Debian 13 (Bookworm)\n✓ System Resources: 4096MB RAM, 72.3GB disk available\n✓ Desktop Environment: XFCE 4.18.2 installed\n✓ RDP Service: xrdp running (PID 1234)\n✓ RDP Port: Listening on 0.0.0.0:3389\n✓ Developer User: devuser exists (UID 1001)\n✓ User Groups: devuser in sudo, audio, video, dialout, plugdev\n✓ Sudo Access: Passwordless sudo configured\n✓ VSCode: Version 1.85.1 installed\n✓ Cursor: Version 0.12.0 installed\n✓ Antigravity: Version 1.4.2 installed\n✓ Git: Version 2.39.2 installed\n✓ Terminal Config: Git aliases and colored prompt configured\n⚠ Firewall Rules: ufw not enabled (consider enabling for security)\n✓ SSH Hardening: PermitRootLogin set to prohibit-password\n\nSummary:\n--------\n14/15 checks passed (13/13 critical)\n1 warning\n\nOverall Status: PASS ✓\n\nWarnings:\n- Firewall not enabled. Run 'ufw enable' and configure rules for SSH (22) and RDP (3389)\n\nSystem is ready for development work!",
+
+      "examples": [
+        {
+          "description": "Run all verification checks",
+          "command": "vps-provision-verify",
+          "expected_behavior": "Runs all checks, displays pass/fail for each"
+        },
+        {
+          "description": "Run only critical checks",
+          "command": "vps-provision-verify --critical-only",
+          "expected_behavior": "Runs only checks marked as critical"
+        },
+        {
+          "description": "Verify specific components",
+          "command": "vps-provision-verify --check rdp-service --check vscode-installed",
+          "expected_behavior": "Runs only specified checks"
+        },
+        {
+          "description": "JSON output for automation",
+          "command": "vps-provision-verify --output-format json",
+          "expected_behavior": "Outputs results as JSON"
+        },
+        {
+          "description": "Verbose output with details",
+          "command": "vps-provision-verify --verbose",
+          "expected_behavior": "Shows detailed information for each check"
+        }
+      ]
+    },
+
+    "vps-provision-status": {
+      "description": "Check current provisioning status and history",
+      "usage": "vps-provision-status [OPTIONS]",
+
+      "purpose": "Display information about current and past provisioning sessions",
+
+      "options": {
+        "--last": {
+          "description": "Show details of most recent session",
+          "type": "flag"
+        },
+        "--session-id": {
+          "description": "Show details of specific session",
+          "type": "string",
+          "example": "vps-provision-status --session-id 20251223-103000"
+        },
+        "--list": {
+          "description": "List all provisioning sessions",
+          "type": "flag"
+        },
+        "--output-format": {
+          "description": "Output format",
+          "type": "choice",
+          "choices": ["text", "json"],
+          "default": "text"
+        },
+        "--filter": {
+          "description": "Filter sessions by status",
+          "type": "choice",
+          "choices": ["SUCCESS", "FAILED", "ROLLED_BACK", "IN_PROGRESS"],
+          "required": false
+        },
+        "--limit": {
+          "description": "Limit number of sessions displayed",
+          "type": "integer",
+          "default": 10,
+          "min": 1,
+          "max": 100
+        }
+      },
+
+      "data_retention": {
+        "session_files": "Keep last 30 sessions or 90 days, whichever is longer",
+        "log_files": "Keep last 30 days, rotate and compress older logs",
+        "transaction_logs": "Keep until rollback executed or 90 days after success",
+        "checkpoint_files": "Keep indefinitely until force re-provision or manual cleanup"
+      },
+
+      "exit_codes": {
+        "0": "Status retrieved successfully",
+        "1": "Session not found",
+        "2": "No provisioning sessions exist"
+      },
+
+      "examples": [
+        {
+          "description": "Show last provisioning session",
+          "command": "vps-provision-status --last",
+          "expected_behavior": "Displays details of most recent session"
+        },
+        {
+          "description": "List all sessions",
+          "command": "vps-provision-status --list",
+          "expected_behavior": "Shows table of all sessions with status"
+        }
+      ]
+    },
+
+    "vps-provision-rollback": {
+      "description": "Manually trigger rollback of last provisioning session",
+      "usage": "vps-provision-rollback [OPTIONS]",
+
+      "purpose": "Undo last provisioning attempt and restore system to clean state",
+
+      "options": {
+        "--session-id": {
+          "description": "Rollback specific session (default: last session)",
+          "type": "string"
+        },
+        "--dry-run": {
+          "description": "Show rollback actions without executing",
+          "type": "flag"
+        },
+        "--force": {
+          "description": "Skip confirmation prompt",
+          "type": "flag"
+        },
+        "--verify": {
+          "description": "Run verification checks after rollback",
+          "type": "flag",
+          "default": true
+        }
+      },
+
+      "exit_codes": {
+        "0": "Rollback completed successfully",
+        "1": "Rollback failed",
+        "2": "No session to rollback",
+        "3": "Rollback verification failed"
+      },
+
+      "behavior": "Reads transaction log, reverses all actions in LIFO order, removes checkpoints",
+
+      "detailed_behavior": {
+        "confirmation": "Prompts for confirmation unless --force specified, shows session details and rollback plan",
+        "transaction_processing": "Reads /var/log/vps-provision/transaction-<session_id>.log in reverse order",
+        "rollback_execution": "Executes each rollback command, logs results, continues on non-critical failures",
+        "checkpoint_cleanup": "Removes all checkpoint files created during the session",
+        "session_update": "Updates session status to ROLLED_BACK in session JSON file",
+        "verification": "Optionally runs system verification to confirm clean state",
+        "dry_run_output": "Shows: session details, transaction count, rollback commands to execute, estimated duration"
+      },
+
+      "rollback_verification": {
+        "checks": [
+          "Verify packages uninstalled successfully",
+          "Confirm configuration files restored from backup",
+          "Check services stopped and disabled",
+          "Verify user accounts removed",
+          "Confirm no orphaned files remain"
+        ],
+        "on_failure": "Exit with code 3, provide detailed failure report with manual cleanup steps"
+      },
+
+      "examples": [
+        {
+          "description": "Rollback last provisioning",
+          "command": "vps-provision-rollback",
+          "expected_behavior": "Undoes last provisioning attempt with confirmation"
+        },
+        {
+          "description": "Dry run rollback",
+          "command": "vps-provision-rollback --dry-run",
+          "expected_behavior": "Shows what would be rolled back without executing"
+        }
+      ]
+    }
+  }
+}

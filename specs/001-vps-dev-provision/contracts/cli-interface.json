@@ -1,0 +1,419 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VPS Provision CLI Interface Contract",
+  "description": "Contract specification for the main vps-provision command-line interface",
+  "version": "1.0.0",
+  "command": "vps-provision",
+  "usage": "vps-provision [OPTIONS]",
+
+  "options": {
+    "--help, -h": {
+      "description": "Display help information and usage examples",
+      "type": "flag",
+      "required": false,
+      "example": "vps-provision --help"
+    },
+
+    "--version, -v": {
+      "description": "Display version information",
+      "type": "flag",
+      "required": false,
+      "example": "vps-provision --version",
+      "output_format": "vps-provision version X.Y.Z"
+    },
+
+    "--dry-run": {
+      "description": "Perform validation and show planned actions without executing them",
+      "type": "flag",
+      "required": false,
+      "example": "vps-provision --dry-run",
+      "behavior": "Validates system requirements, lists phases and actions, exits without modifications",
+      "checkpoint_detection": "Checks for existing checkpoints and reports which phases would be skipped",
+      "output_includes": [
+        "System validation results",
+        "Phases to be executed (with checkpoint status)",
+        "Estimated duration per phase",
+        "Total estimated provisioning time",
+        "Disk space required",
+        "Network bandwidth estimate"
+      ],
+      "performance": "Completes in <30 seconds, does not download or install any packages",
+      "exit_code": "0 if validation passes, 1 if pre-flight validation fails"
+    },
+
+    "--skip-validation": {
+      "description": "Skip pre-flight system validation checks (not recommended)",
+      "type": "flag",
+      "required": false,
+      "example": "vps-provision --skip-validation",
+      "warning": "May cause provisioning to fail if system requirements not met"
+    },
+
+    "--config, -c": {
+      "description": "Path to custom configuration file",
+      "type": "path",
+      "required": false,
+      "default": "/etc/vps-provision/config.conf",
+      "example": "vps-provision --config /path/to/custom.conf",
+      "validation": "File must exist and be readable",
+      "path_validation": {
+        "must_exist": true,
+        "must_be_file": true,
+        "must_be_readable": true,
+        "max_size": "1MB",
+        "allowed_extensions": [".conf", ".ini", ".cfg"],
+        "special_characters": "All valid filesystem characters allowed"
+      },
+      "error_messages": {
+        "not_found": "Configuration file not found at specified path",
+        "not_readable": "Permission denied: cannot read configuration file",
+        "too_large": "Configuration file exceeds maximum size of 1MB",
+        "invalid_extension": "Configuration file must have .conf, .ini, or .cfg extension"
+      }
+    },
+
+    "--log-level": {
+      "description": "Set logging verbosity level",
+      "type": "choice",
+      "required": false,
+      "default": "INFO",
+      "choices": ["DEBUG", "INFO", "WARNING", "ERROR"],
+      "example": "vps-provision --log-level DEBUG"
+    },
+
+    "--no-color": {
+      "description": "Disable colored terminal output",
+      "type": "flag",
+      "required": false,
+      "example": "vps-provision --no-color"
+    },
+
+    "--resume": {
+      "description": "Resume provisioning from last checkpoint after failure",
+      "type": "flag",
+      "required": false,
+      "example": "vps-provision --resume",
+      "behavior": "Skips completed phases based on checkpoint files"
+    },
+
+    "--force": {
+      "description": "Force provisioning even if checkpoints exist (re-provision)",
+      "type": "flag",
+      "required": false,
+      "example": "vps-provision --force",
+      "behavior": "Ignores existing checkpoints, runs all phases"
+    },
+
+    "--skip-phase": {
+      "description": "Skip specific provisioning phase(s)",
+      "type": "multi-value",
+      "required": false,
+      "example": "vps-provision --skip-phase desktop-install --skip-phase ide-antigravity",
+      "valid_values": [
+        "system-prep",
+        "desktop-install",
+        "rdp-config",
+        "user-creation",
+        "ide-vscode",
+        "ide-cursor",
+        "ide-antigravity",
+        "terminal-setup",
+        "dev-tools",
+        "verification"
+      ]
+    },
+
+    "--only-phase": {
+      "description": "Run only specific provisioning phase(s)",
+      "type": "multi-value",
+      "required": false,
+      "example": "vps-provision --only-phase verification",
+      "valid_values": [
+        "system-prep",
+        "desktop-install",
+        "rdp-config",
+        "user-creation",
+        "ide-vscode",
+        "ide-cursor",
+        "ide-antigravity",
+        "terminal-setup",
+        "dev-tools",
+        "verification"
+      ],
+      "conflicts_with": ["--skip-phase"]
+    },
+
+    "--username": {
+      "description": "Custom username for developer account (default: devuser)",
+      "type": "string",
+      "required": false,
+      "default": "devuser",
+      "example": "vps-provision --username johndoe",
+      "validation": "Must match regex: ^[a-z][a-z0-9_-]{2,31}$",
+      "length": {
+        "min": 3,
+        "max": 32
+      },
+      "special_characters": "Only underscore (_) and hyphen (-) allowed",
+      "error_messages": {
+        "invalid_format": "Username must start with lowercase letter and contain only lowercase letters, numbers, underscore, hyphen",
+        "too_short": "Username must be at least 3 characters long",
+        "too_long": "Username must not exceed 32 characters"
+      }
+    },
+
+    "--output-format": {
+      "description": "Output format for completion summary",
+      "type": "choice",
+      "required": false,
+      "default": "text",
+      "choices": ["text", "json"],
+      "example": "vps-provision --output-format json"
+    }
+  },
+
+  "exit_codes": {
+    "0": {
+      "name": "SUCCESS",
+      "description": "Provisioning completed successfully, all components installed and verified"
+    },
+    "1": {
+      "name": "VALIDATION_FAILED",
+      "description": "Pre-flight validation failed (wrong OS version, insufficient resources, etc.)"
+    },
+    "2": {
+      "name": "PROVISIONING_FAILED",
+      "description": "Provisioning failed during execution, check logs for details"
+    },
+    "3": {
+      "name": "ROLLBACK_FAILED",
+      "description": "Provisioning failed and rollback also failed, manual cleanup required"
+    },
+    "4": {
+      "name": "VERIFICATION_FAILED",
+      "description": "Provisioning completed but post-installation verification failed"
+    },
+    "5": {
+      "name": "CONFIG_ERROR",
+      "description": "Configuration file invalid or unreadable"
+    },
+    "6": {
+      "name": "PERMISSION_DENIED",
+      "description": "Insufficient permissions to execute provisioning (must run as root)"
+    },
+    "127": {
+      "name": "COMMAND_NOT_FOUND",
+      "description": "Required command or dependency not found"
+    }
+  },
+
+  "output_schema": {
+    "text_format": {
+      "description": "Human-readable text output with progress updates and final summary",
+      "structure": [
+        "Banner with version and timestamp",
+        "Pre-flight validation results",
+        "Phase-by-phase progress with timing",
+        "Real-time status updates",
+        "Completion summary with connection info",
+        "Generated credentials (displayed once)"
+      ],
+      "example": "See quickstart.md for full example output"
+    },
+
+    "json_format": {
+      "description": "Machine-readable JSON output for automation",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["SUCCESS", "FAILED", "ROLLED_BACK"]
+          },
+          "session_id": {
+            "type": "string",
+            "description": "Unique session identifier"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "duration_seconds": {
+            "type": "integer"
+          },
+          "vps_info": {
+            "type": "object",
+            "properties": {
+              "hostname": { "type": "string" },
+              "ip_address": { "type": "string" },
+              "os_version": { "type": "string" },
+              "cpu_cores": { "type": "integer" },
+              "ram_mb": { "type": "integer" }
+            }
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "status": { "type": "string" },
+                "duration_seconds": { "type": "integer" }
+              }
+            }
+          },
+          "developer_user": {
+            "type": "object",
+            "properties": {
+              "username": { "type": "string" },
+              "password": { "type": "string" },
+              "groups": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "ide_installations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "version": { "type": "string" },
+                "verified": { "type": "boolean" }
+              }
+            }
+          },
+          "connection_info": {
+            "type": "object",
+            "properties": {
+              "rdp_address": { "type": "string" },
+              "rdp_port": { "type": "integer" },
+              "ssh_command": { "type": "string" }
+            }
+          },
+          "error_details": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["status", "session_id", "start_time", "vps_info"]
+      }
+    }
+  },
+
+  "examples": [
+    {
+      "description": "Basic provisioning with default settings",
+      "command": "vps-provision",
+      "expected_behavior": "Runs all phases, creates 'devuser' account, installs all IDEs"
+    },
+    {
+      "description": "Dry run to preview actions",
+      "command": "vps-provision --dry-run",
+      "expected_behavior": "Shows planned actions without executing, exits with code 0"
+    },
+    {
+      "description": "Resume after failure",
+      "command": "vps-provision --resume",
+      "expected_behavior": "Skips completed phases, continues from failure point"
+    },
+    {
+      "description": "Custom username with debug logging",
+      "command": "vps-provision --username alice --log-level DEBUG",
+      "expected_behavior": "Creates 'alice' account, shows detailed debug output"
+    },
+    {
+      "description": "Install only specific components",
+      "command": "vps-provision --only-phase ide-vscode --only-phase ide-cursor",
+      "expected_behavior": "Installs only VSCode and Cursor, skips other phases"
+    },
+    {
+      "description": "JSON output for automation",
+      "command": "vps-provision --output-format json > result.json",
+      "expected_behavior": "Outputs machine-readable JSON to file"
+    }
+  ],
+
+  "environment_variables": {
+    "VPS_PROVISION_CONFIG": {
+      "description": "Path to configuration file (overridden by --config flag)",
+      "default": "/etc/vps-provision/config.conf"
+    },
+    "VPS_PROVISION_LOG_DIR": {
+      "description": "Directory for log files",
+      "default": "/var/log/vps-provision"
+    },
+    "VPS_PROVISION_NO_COLOR": {
+      "description": "Disable colored output (set to any value)",
+      "example": "VPS_PROVISION_NO_COLOR=1 vps-provision"
+    }
+  },
+
+  "prerequisites": {
+    "user": "Must run as root or with sudo privileges",
+    "os": "Debian 13 (Bookworm) only",
+    "network": "Active internet connection required",
+    "disk_space": "Minimum 10GB available",
+    "memory": "Minimum 2GB RAM"
+  },
+
+  "behavior": {
+    "idempotency": "Safe to run multiple times; detects existing installations and skips or updates",
+    "rollback": "Automatic rollback on failure to restore system to clean state",
+    "logging": "All actions logged to /var/log/vps-provision/provision-<timestamp>.log",
+    "progress": "Real-time progress updates with estimated time remaining",
+    "credentials": "Generated password displayed once in output, not saved to disk",
+    "stdio": {
+      "stdin": "Not used; command accepts no interactive input",
+      "stdout": "Progress updates, informational messages, and final summary (affected by --output-format)",
+      "stderr": "Error messages, warnings, and diagnostic information"
+    },
+    "signals": {
+      "SIGINT": "Graceful shutdown: stop current operation, trigger rollback, exit with code 130",
+      "SIGTERM": "Graceful shutdown: stop current operation, trigger rollback, exit with code 143",
+      "SIGHUP": "Ignored during provisioning to prevent accidental interruption"
+    },
+    "help_format": {
+      "structure": [
+        "Usage line with command and options syntax",
+        "Brief description of command purpose",
+        "Options table with flags, descriptions, defaults",
+        "Examples section with common use cases",
+        "Exit codes reference",
+        "Environment variables reference"
+      ],
+      "width": "80 characters maximum for readability"
+    },
+    "output_limits": {
+      "max_line_length": 120,
+      "log_truncation": "Individual command output truncated to 1000 lines per operation",
+      "error_context": "Maximum 50 lines of context for error messages"
+    },
+    "case_sensitivity": {
+      "options": "Case-sensitive (--help not same as --Help)",
+      "option_values": "Case-insensitive for choices (DEBUG same as debug)",
+      "phase_names": "Case-sensitive (system-prep not same as System-Prep)",
+      "username": "Case-sensitive, must be lowercase per validation regex"
+    }
+  },
+
+  "configuration": {
+    "file_format": "INI-style key=value format with sections",
+    "example": "[general]\nlog_level=INFO\nusername=devuser\n\n[network]\nretry_attempts=3\ntimeout=300",
+    "precedence": [
+      "Command-line flags (highest priority)",
+      "Environment variables",
+      "Configuration file specified by --config",
+      "Default configuration file at /etc/vps-provision/config.conf",
+      "Built-in defaults (lowest priority)"
+    ],
+    "validation": {
+      "required": false,
+      "schema": "Must be valid INI format with recognized sections and keys",
+      "unknown_keys": "Warning logged, ignored during execution",
+      "invalid_values": "Error raised, provisioning aborted with exit code 5"
+    }
+  }
+}
