@@ -91,6 +91,55 @@ else
     esac
   }
   
+  refute_output() {
+    local expected=""
+    local mode="exact"
+    
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --partial)
+          mode="partial"
+          shift
+          ;;
+        --regexp)
+          mode="regexp"
+          shift
+          ;;
+        *)
+          expected="$1"
+          shift
+          ;;
+      esac
+    done
+    
+    case "${mode}" in
+      exact)
+        if [[ "${output}" == "${expected}" ]]; then
+          echo "Output should not match:" >&2
+          echo "Unexpected: ${expected}" >&2
+          echo "Got: ${output}" >&2
+          return 1
+        fi
+        ;;
+      partial)
+        if [[ "${output}" == *"${expected}"* ]]; then
+          echo "Output should not contain text:" >&2
+          echo "Unexpected substring: ${expected}" >&2
+          echo "Got: ${output}" >&2
+          return 1
+        fi
+        ;;
+      regexp)
+        if [[ "${output}" =~ ${expected} ]]; then
+          echo "Output should not match regex:" >&2
+          echo "Unexpected pattern: ${expected}" >&2
+          echo "Got: ${output}" >&2
+          return 1
+        fi
+        ;;
+    esac
+  }
+  
   assert_line() {
     local line_match=""
     local mode="exact"

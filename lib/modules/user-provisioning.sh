@@ -313,6 +313,7 @@ EOF
 
 # user_provisioning_generate_password
 # Generates strong random password and sets it for user
+# Implements SEC-001 (16+ chars), SEC-002 (CSPRNG), SEC-003 (redaction)
 #
 # Args:
 #   $1 - Username
@@ -326,32 +327,50 @@ EOF
 user_provisioning_generate_password() {
   local username="$1"
   local password
+  local stderr_output
   
-  log_info "Generating secure password for ${username}"
+  log_info "Generating secure password for ${username} (16+ chars, CSPRNG)"
   
-  # Generate password using Python utility
-  password=$(python3 "${LIB_DIR}/utils/credential-gen.py" --length 20 --complexity high 2>&1)
+  # Generate password using Python utility (captures stderr separately)
+  # SEC-002: Uses CSPRNG via secrets module
+  # SEC-001: Enforces minimum 16 characters
+  stderr_output=$(mktemp)
+  password=$(python3 "${LIB_DIR}/utils/credential-gen.py" --length 20 --complexity high 2>"${stderr_output}")
+  local gen_exit_code=$?
   
-  if [[ -z "${password}" || "${password}" == *"Error"* ]]; then
-    log_error "Failed to generate password"
+  if [[ ${gen_exit_code} -ne 0 ]]; then
+    log_error "Password generation failed: $(cat "${stderr_output}")"
+    rm -f "${stderr_output}"
     return 1
   fi
   
-  # Set password for user
-  if ! echo "${username}:${password}" | chpasswd 2>&1 | tee -a "${LOG_FILE}"; then
-    log_error "Failed to set password for ${username}"
+  if [[ -z "${password}" ]]; then
+    log_error "Password generation returned empty result"
+    rm -f "${stderr_output}"
     return 1
   fi
   
-  # Force password change on first login
-  if ! chage -d 0 "${username}" 2>&1 | tee -a "${LOG_FILE}"; then
+  rm -f "${stderr_output}"
+  
+  # SEC-003: Set password WITHOUT logging it (use 2>&1 redirection to /dev/null for chpasswd)
+  # We only log success/failure, never the actual password
+  if ! echo "${username}:${password}" | chpasswd 2>/dev/null; then
+    log_error "Failed to set password for ${username} (chpasswd failed)"
+    return 1
+  fi
+  
+  log_info "Password set successfully for ${username} (password: [REDACTED])"
+  
+  # SEC-004: Force password change on first login per requirement
+  if ! chage -d 0 "${username}" 2>&1 | grep -v "password" | tee -a "${LOG_FILE}" > /dev/null; then
     log_error "Failed to set password expiration for ${username}"
     return 1
   fi
   
-  log_info "Password generated and configured successfully"
+  log_info "Password expiry configured: user must change on first login (SEC-004)"
   
-  # Return password for display (security note: this is intentional per FR-027)
+  # Return password for display in final summary ONLY (security note: intentional per FR-027)
+  # Calling function is responsible for secure display (not logging to file)
   echo "${password}"
   return 0
 }

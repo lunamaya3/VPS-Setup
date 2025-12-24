@@ -158,9 +158,11 @@ rdp_server_generate_certificates() {
   fi
   
   # Generate new self-signed certificate (valid for 10 years)
+  # SEC-007: Use 4096-bit RSA for strong encryption
   local hostname
   hostname=$(hostname -f 2>/dev/null || hostname)
   
+  log_info "Generating 4096-bit RSA self-signed certificate (SEC-007)"
   if ! openssl req -x509 -newkey rsa:4096 \
     -keyout "${KEY_FILE}" \
     -out "${CERT_FILE}" \

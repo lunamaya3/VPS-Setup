@@ -268,14 +268,14 @@
 
 ### Authentication & Credentials
 
-- [ ] T086 Enhance credential generator to enforce 16+ character passwords with complexity per SEC-001, use CSPRNG per SEC-002, redact passwords in logs per SEC-003
-- [ ] T087 Configure password expiry on first login using `chage -d 0` per SEC-004
-- [ ] T088 Create security test to verify password complexity, check for password leaks in logs
+- [x] T086 Enhance credential generator to enforce 16+ character passwords with complexity per SEC-001, use CSPRNG per SEC-002, redact passwords in logs per SEC-003
+- [x] T087 Configure password expiry on first login using `chage -d 0` per SEC-004
+- [x] T088 Create security test to verify password complexity, check for password leaks in logs
 
 ### SSH Hardening
 
-- [ ] T089 Implement SSH hardening in system prep module: disable root login (PermitRootLogin no) per SEC-005, disable password authentication (PasswordAuthentication no), configure strong key exchange algorithms per SEC-006
-- [ ] T090 Create verification test for SSH configuration security
+- [x] T089 Implement SSH hardening in system prep module: disable root login (PermitRootLogin no) per SEC-005, disable password authentication (PasswordAuthentication no), configure strong key exchange algorithms per SEC-006
+- [x] T090 Create verification test for SSH configuration security
 
 ### TLS & Encryption
 
