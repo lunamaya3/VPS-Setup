@@ -13,9 +13,10 @@ load ../test_helper
 
 setup() {
   export LIB_DIR="${BATS_TEST_DIRNAME}/../../lib"
-  export LOG_DIR="${BATS_TMPDIR}/vps-provision-test"
+  # Use unique directory for each test execution to prevent state pollution
+  export LOG_DIR="$(mktemp -d)"
   export LOG_FILE="${LOG_DIR}/test.log"
-  export CHECKPOINT_DIR="${BATS_TMPDIR}/checkpoints"
+  export CHECKPOINT_DIR="${LOG_DIR}/checkpoints"
   export TRANSACTION_LOG="${LOG_DIR}/transactions.log"
   
   mkdir -p "${LOG_DIR}" "${CHECKPOINT_DIR}"
@@ -31,7 +32,110 @@ setup() {
   checkpoint_init
   
   # Source module under test
+  # Source module under test
   source "${LIB_DIR}/modules/dev-tools.sh"
+
+  # Mock apt-get
+  function apt-get() {
+    echo "apt-get $*" >> "${LOG_FILE}"
+    if [[ "$*" == *"install"* ]]; then
+        # Simulate installation by creating a file
+        local pkg="${@: -1}"
+        touch "${LOG_DIR}/installed_${pkg}"
+    fi
+    return 0
+  }
+  export -f apt-get
+
+  # Mock dpkg
+  function dpkg() {
+    # Check if we simulated installation
+    if [[ "$1" == "-l" ]]; then
+        if [[ -f "${LOG_DIR}/installed_${2}" ]]; then
+            echo "ii  $2"
+            return 0
+        fi
+        return 1
+    fi
+    return 1
+  }
+  export -f dpkg
+
+  # Mock git
+  function git() {
+    echo "git $*" >> "${LOG_FILE}"
+    if [[ "$1" == "config" ]]; then
+       if [[ "$*" =~ "init.defaultBranch" ]]; then echo "main"; fi
+       if [[ "$*" =~ "color.ui" ]]; then echo "auto"; fi
+       if [[ "$*" =~ "core.editor" ]]; then echo "vim"; fi
+       if [[ "$*" =~ "credential.helper" ]]; then echo "cache"; fi
+       return 0
+    elif [[ "$1" == "--version" ]]; then
+       echo "git version 2.0.0"
+       return 0
+    fi
+    return 0
+  }
+  export -f git
+
+  # Mock other tools for verification
+  function vim() { echo "vim 1.0"; return 0; }
+  export -f vim
+  function curl() { echo "curl 1.0"; return 0; }
+  export -f curl
+  function jq() { echo "jq 1.0"; return 0; }
+  export -f jq
+  function htop() { echo "htop 1.0"; return 0; }
+  export -f htop
+  function tree() { echo "tree 1.0"; return 0; }
+  export -f tree
+  function tmux() { echo "tmux 1.0"; return 0; }
+  export -f tmux
+  function wget() { echo "wget 1.0"; return 0; }
+  export -f wget
+  function netstat() { echo "netstat 1.0"; return 0; }
+  export -f netstat
+  function dig() { echo "dig 1.0"; return 0; } # dnsutils
+  export -f dig
+  
+  # Mock progress functions
+  function progress_start() {
+      echo "progress_start $*" >> "${LOG_FILE}"
+      echo "progress_start $*"
+      return 0
+  }
+  export -f progress_start
+  
+  function progress_update() {
+      echo "progress_update $*" >> "${LOG_FILE}"
+      echo "progress_update $*"
+      return 0
+  }
+  export -f progress_update
+  
+  function progress_fail() {
+      echo "progress_fail $*" >> "${LOG_FILE}"
+      echo "progress_fail $*"
+      # dev-tools.sh passes message as second arg: phase, message
+      # But echo $* outputs all. assert_output partial will match.
+      return 0
+  }
+  export -f progress_fail
+  
+  function progress_complete() {
+      echo "progress_complete $*" >> "${LOG_FILE}"
+      echo "progress_complete $*"
+      return 0
+  }
+  export -f progress_complete
+  
+  # Mock command -v to succeed for these
+  # Mock command -v to succeed for these, but fail for "nonexistent"
+  function command() {
+    if [[ "$2" == *"nonexistent"* ]]; then return 1; fi
+    return 0
+  }
+  export -f command
 }
 
 teardown() {

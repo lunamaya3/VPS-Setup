@@ -139,10 +139,10 @@ dev_tools_install_core_tools() {
   
   for tool in "${CORE_TOOLS[@]}"; do
     if dev_tools_install_package "${tool}"; then
-      ((installed++))
+      ((installed+=1))
     else
       log_warning "Failed to install tool: ${tool}"
-      ((failed++))
+      ((failed+=1))
     fi
   done
   

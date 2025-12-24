@@ -15,7 +15,10 @@ source "${LIB_DIR}/core/checkpoint.sh"
 
 readonly VERIFICATION_PHASE="verification"
 
-# Verification: Check all services are running
+# Helpers for testing
+check_file() { [[ -f "$1" ]]; }
+check_dir() { [[ -d "$1" ]]; }
+check_executable() { [[ -x "$1" ]]; }
 verification_check_services() {
   log_info "Verifying system services..."
   local services_ok=true
@@ -70,7 +73,7 @@ verification_check_ides() {
   fi
   
   # Check Cursor
-  if command -v cursor &>/dev/null || [[ -x "/opt/cursor/cursor" ]]; then
+  if command -v cursor &>/dev/null || check_executable "/opt/cursor/cursor"; then
     log_info "✓ Cursor executable found"
   else
     log_error "Cursor not found"
@@ -78,7 +81,7 @@ verification_check_ides() {
   fi
   
   # Check Antigravity
-  if command -v antigravity &>/dev/null || [[ -x "/usr/local/bin/antigravity" ]]; then
+  if command -v antigravity &>/dev/null || check_executable "/usr/local/bin/antigravity"; then
     log_info "✓ Antigravity executable found"
   else
     log_error "Antigravity not found"
@@ -129,7 +132,7 @@ verification_check_permissions() {
   local perms_ok=true
   
   # Check xrdp TLS certificates
-  if [[ -f "/etc/xrdp/cert.pem" ]]; then
+  if check_file "/etc/xrdp/cert.pem"; then
     local cert_perms
     cert_perms=$(stat -c "%a" /etc/xrdp/cert.pem 2>/dev/null || echo "000")
     if [[ "${cert_perms}" == "644" ]] || [[ "${cert_perms}" == "600" ]]; then
@@ -140,7 +143,7 @@ verification_check_permissions() {
   fi
   
   # Check developer user home directory
-  if [[ -d "/home/devuser" ]]; then
+  if check_dir "/home/devuser"; then
     local home_owner
     home_owner=$(stat -c "%U" /home/devuser 2>/dev/null || echo "unknown")
     if [[ "${home_owner}" == "devuser" ]]; then
@@ -164,7 +167,7 @@ verification_check_configurations() {
   local configs_ok=true
   
   # Check xrdp configuration
-  if [[ -f "/etc/xrdp/xrdp.ini" ]]; then
+  if check_file "/etc/xrdp/xrdp.ini"; then
     if grep -q "max_bpp=32" /etc/xrdp/xrdp.ini; then
       log_info "✓ xrdp.ini configured correctly (max_bpp=32)"
     else
@@ -176,7 +179,7 @@ verification_check_configurations() {
   fi
   
   # Check XFCE configuration
-  if [[ -d "/etc/xdg/xfce4" ]] || [[ -d "/home/devuser/.config/xfce4" ]]; then
+  if check_dir "/etc/xdg/xfce4" || check_dir "/home/devuser/.config/xfce4"; then
     log_info "✓ XFCE configuration directory exists"
   else
     log_warning "XFCE configuration directory not found"

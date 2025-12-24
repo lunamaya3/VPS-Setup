@@ -43,6 +43,18 @@ readonly LIGHTDM_CONF="${LIGHTDM_CONF:-/etc/lightdm/lightdm.conf}"
 readonly XFCE_CONFIG_DIR="${XFCE_CONFIG_DIR:-/etc/skel/.config/xfce4}"
 readonly DESKTOP_CONFIG_SOURCE="${DESKTOP_CONFIG_SOURCE:-${LIB_DIR}/../config/desktop}"
 
+# Helper: Check if a file exists
+# Can be mocked in tests
+check_critical_file() {
+  [[ -f "$1" ]]
+}
+
+# Helper: Check if a command exists
+# Can be mocked in tests
+check_command_exists() {
+  command -v "$1" &> /dev/null
+}
+
 # desktop_env_check_prerequisites
 # Validates system is ready for desktop installation
 #
@@ -238,13 +250,13 @@ desktop_env_validate_installation() {
   progress_update "Validating installation" 95
   
   # Check XFCE installation
-  if ! command -v startxfce4 &> /dev/null; then
+  if ! check_command_exists "startxfce4"; then
     log_error "XFCE not properly installed (startxfce4 missing)"
     return 1
   fi
   
   # Check LightDM installation
-  if ! command -v lightdm &> /dev/null; then
+  if ! check_command_exists "lightdm"; then
     log_error "LightDM not properly installed"
     return 1
   fi
@@ -258,14 +270,14 @@ desktop_env_validate_installation() {
   )
   
   for file in "${critical_files[@]}"; do
-    if [[ ! -f "${file}" ]]; then
+    if ! check_critical_file "${file}"; then
       log_error "Critical file missing: ${file}"
       return 1
     fi
   done
   
   # Check desktop session file
-  if [[ ! -f "/usr/share/xsessions/xfce.desktop" ]]; then
+  if ! check_critical_file "/usr/share/xsessions/xfce.desktop"; then
     log_error "XFCE desktop session file missing"
     return 1
   fi
