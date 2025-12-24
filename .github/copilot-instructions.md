@@ -102,6 +102,29 @@ Before responding to ANY request, verify:
 
 ---
 
+## 🎯 Current Project Status (as of Dec 2025)
+
+### ✅ Completed: User Story 1 - MVP Functional
+- **53 tasks complete** (T001-T053)
+- **All 8 implementation phases** operational
+- **Full VPS provisioning** working end-to-end
+- **3 IDEs installed** (VSCode, Cursor, Antigravity)
+- **RDP access** configured and tested
+- **Post-provisioning validation** implemented
+
+### 🔄 Next Up: User Story 2 - Privileged Operations
+- **Tasks T054-T057**: Sudo configuration, audit logging
+- **Focus**: Friction-free developer experience for system operations
+- **Branch**: Continue on `001-vps-dev-provision`
+
+### 📊 Code Metrics
+- **Shell scripts**: 15+ modules in `lib/`
+- **Test files**: 10+ test suites (unit, integration, E2E)
+- **Test coverage**: ≥80% for utilities, ≥90% for validation
+- **Code quality**: All shellcheck warnings resolved
+
+---
+
 ## Architecture & Big Picture
 
 ### Core Design Pattern: Modular Provisioning Pipeline
@@ -187,6 +210,37 @@ Success report with login credentials, timings, logs
 
 ## Critical Developer Workflows
 
+### Git Hooks & Quality Gates
+
+**Pre-commit Hook** (`.git/hooks/pre-commit`):
+
+- Runs automatically on `git commit`
+- 5 checks: shellcheck (warnings only), JSON validation, secret detection, file permissions, syntax
+- Bypass: `git commit --no-verify` (not recommended)
+- Shellcheck uses `-S warning` severity to ignore info messages
+
+**Pre-push Hook** (`.git/hooks/pre-push`):
+
+- Runs automatically on `git push`
+- 3 checks: unit tests (bats), config validation, uncommitted state file detection
+- Bypass: `git push --no-verify`
+
+**Running Quality Checks Manually:**
+
+```bash
+# Shellcheck (warning severity only)
+shellcheck -S warning lib/modules/*.sh
+
+# Unit tests
+bats tests/unit/*.bats
+
+# JSON validation
+jq empty lib/models/*.json
+
+# Full pre-commit check
+.git/hooks/pre-commit
+```
+
 ### Running Full Provisioning (For Testing)
 
 ```bash
@@ -250,18 +304,28 @@ DEBUG=1 bats tests/unit/test_xrdp_setup.bats
 
 ## Phase Reference & Interactions (From `tasks.md`)
 
-| Phase                     | Purpose                        | Key Tasks                                           | Dependencies |
-| ------------------------- | ------------------------------ | --------------------------------------------------- | ------------ |
-| **Phase 1: Setup**        | Project initialization         | Directory structure, Git, Makefile                  | None         |
-| **Phase 2: Core Infra**   | Logging, checkpoints, rollback | Logger, Progress, Checkpoint, Transaction, Rollback | Phase 1      |
-| **Phase 3: Validation**   | Pre-flight checks              | Validator, Schema models                            | Phase 2      |
-| **Phase 4: System Setup** | Base OS configuration          | Apt updates, dependencies                           | Phase 3      |
-| **Phase 5: Desktop**      | XFCE + RDP                     | Desktop install, xrdp config                        | Phase 4      |
-| **Phase 6: User Setup**   | Developer account              | User creation, sudo, shell config                   | Phase 5      |
-| **Phase 7: IDEs**         | Development tools              | VSCode, Cursor, Antigravity installs                | Phase 6      |
-| **Phase 8: Validation**   | Post-provisioning checks       | Python validation script                            | Phase 7      |
+| Phase                     | Purpose                        | Key Tasks                                           | Status      | Dependencies |
+| ------------------------- | ------------------------------ | --------------------------------------------------- | ----------- | ------------ |
+| **Phase 1: Setup**        | Project initialization         | Directory structure, Git, Makefile                  | ✅ Complete | None         |
+| **Phase 2: Core Infra**   | Logging, checkpoints, rollback | Logger, Progress, Checkpoint, Transaction, Rollback | ✅ Complete | Phase 1      |
+| **Phase 3: Validation**   | Pre-flight checks              | Validator, Schema models, verification modules      | ✅ Complete | Phase 2      |
+| **Phase 4: System Setup** | Base OS configuration          | Apt updates, dependencies                           | ✅ Complete | Phase 3      |
+| **Phase 5: Desktop**      | XFCE + RDP                     | Desktop install, xrdp config                        | ✅ Complete | Phase 4      |
+| **Phase 6: User Setup**   | Developer account              | User creation, sudo, shell config                   | ✅ Complete | Phase 5      |
+| **Phase 7: IDEs**         | Development tools              | VSCode, Cursor, Antigravity installs                | ✅ Complete | Phase 6      |
+| **Phase 8: Validation**   | Post-provisioning checks       | Verification, summary report, status banner, E2E    | ✅ Complete | Phase 7      |
 
 ### Phase Interaction Details
+
+**User Story 1 (US1) Complete - One-Command VPS Setup:**
+All 53 tasks (T001-T053) completed. The MVP is functional with full provisioning capability including:
+
+- System preparation and desktop environment (XFCE 4.18)
+- RDP server with multi-session support
+- Three IDEs (VSCode, Cursor, Antigravity)
+- Developer user with passwordless sudo
+- Terminal enhancements and dev tools
+- Post-provisioning verification, summary reporting, and success banner
 
 **Phase 4 → Phase 5 → Phase 7 Critical Path:**
 Phase 4 installs core dependencies (build-essential, curl, git). Phase 5 configures graphical environment (XFCE, xrdp), requiring Phase 4 dependencies. Phase 7 installs IDEs which depend on both desktop environment (Phase 5) and build tools (Phase 4).
@@ -274,6 +338,13 @@ Validation checks (Debian 13, ≥2GB RAM, ≥25GB disk, network connectivity) mu
 
 **Checkpoints Prevent Re-execution:**
 Each phase creates checkpoints (`/var/vps-provision/checkpoints/phase-N-complete`). Subsequent runs detect checkpoints and skip completed phases, enabling safe re-runs and recovery from mid-provisioning failures.
+
+**Phase 8 Verification Components:**
+
+- `lib/modules/verification.sh` - Service, IDE, port, permission, and config validation
+- `lib/modules/summary-report.sh` - JSON report with versions, durations, resource usage
+- `lib/modules/status-banner.sh` - User-facing success display with connection details
+- `tests/e2e/test_full_provision.sh` - E2E tests validating all 12 success criteria (SC-001 to SC-012)
 
 ## Performance Constraints & Goals
 
