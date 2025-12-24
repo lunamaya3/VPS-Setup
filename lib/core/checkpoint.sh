@@ -227,8 +227,16 @@ checkpoint_show_status() {
 # Check if phase should be skipped (checkpoint exists)
 # Args: $1 - phase name
 # Returns: 0 if should skip, 1 if should run
+# Environment: FORCE_MODE - if "true", never skip (re-run everything)
 checkpoint_should_skip() {
   local phase_name="$1"
+  local force_mode="${FORCE_MODE:-false}"
+  
+  # Force mode: always run, never skip
+  if [[ "${force_mode}" == "true" ]]; then
+    log_debug "Phase '$phase_name' will run (force mode enabled)"
+    return 1
+  fi
   
   if checkpoint_exists "$phase_name"; then
     log_info "Skipping phase '$phase_name' (checkpoint exists)"
@@ -270,5 +278,31 @@ checkpoint_cleanup_old() {
     log_info "Cleaned up $count old checkpoint(s) (older than $days days)"
   fi
   
+  return 0
+}
+
+# Handle force mode - clear all checkpoints if force mode is enabled
+# Environment: FORCE_MODE - if "true", clear all checkpoints
+# Returns: 0 on success
+checkpoint_handle_force_mode() {
+  local force_mode="${FORCE_MODE:-false}"
+  
+  if [[ "${force_mode}" != "true" ]]; then
+    log_debug "Force mode not enabled, checkpoints preserved"
+    return 0
+  fi
+  
+  local count
+  count=$(checkpoint_count)
+  
+  if [[ $count -eq 0 ]]; then
+    log_info "Force mode enabled (no existing checkpoints to clear)"
+    return 0
+  fi
+  
+  log_warning "Force mode enabled: clearing $count existing checkpoint(s)"
+  checkpoint_clear_all
+  
+  log_info "All checkpoints cleared - full re-provisioning will occur"
   return 0
 }

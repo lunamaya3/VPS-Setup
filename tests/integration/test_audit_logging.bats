@@ -23,11 +23,12 @@ setup() {
   TEST_DIR="${BATS_TEST_TMPDIR}/audit-test"
   mkdir -p "${TEST_DIR}"
   
-  # Source core libraries
-  source "${PROJECT_ROOT}/lib/core/logger.sh"
-  
-  # Set up test environment
+  # Set LOG_FILE BEFORE sourcing logger.sh (it uses readonly)
   export LOG_FILE="${TEST_DIR}/test.log"
+  export LOG_DIR="${TEST_DIR}"
+  
+  # Source core libraries (they'll use our LOG_FILE/LOG_DIR)
+  source "${PROJECT_ROOT}/lib/core/logger.sh" 2>/dev/null || true
   
   # Determine test username
   TEST_USERNAME="${TEST_USERNAME:-devuser}"

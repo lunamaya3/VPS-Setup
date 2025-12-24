@@ -2,6 +2,9 @@
 # Bats Test Helper
 # Common functions and assertions for all test suites
 
+# Set PROJECT_ROOT for all tests (works from any subdirectory)
+export PROJECT_ROOT="$(cd "${BATS_TEST_DIRNAME:-$(dirname "$0")}" && git rev-parse --show-toplevel 2>/dev/null || echo "${BATS_TEST_DIRNAME:-$(dirname "$0")}/../..")"
+
 # Load bats support libraries if available
 if [[ -d "${BATS_TEST_DIRNAME}/../node_modules/bats-support" ]]; then
   load "${BATS_TEST_DIRNAME}/../node_modules/bats-support/load"

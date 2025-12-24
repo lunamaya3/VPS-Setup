@@ -165,14 +165,14 @@
 
 ### Multi-Session Configuration
 
-- [ ] T058 [US3] Enhance RDP module to configure sesman.ini for MaxSessions=50, session isolation via separate X displays, KillDisconnected=0 for session persistence per installation-specs.md §Multi-Session
-- [ ] T059 [US3] Implement resource monitoring in RDP module to track per-session memory usage, validate 3 concurrent sessions within 4GB RAM (3GB used, 1GB buffer) per performance-specs.md
-- [ ] T060 [US3] Create integration test in `tests/integration/test_multi_session.bats` to simulate 3 concurrent RDP connections, verify session isolation (separate processes, separate X displays), test session reconnection preserves state, measure latency ≤120ms per performance-specs.md
+- [x] T058 [US3] Enhance RDP module to configure sesman.ini for MaxSessions=50, session isolation via separate X displays, KillDisconnected=0 for session persistence per installation-specs.md §Multi-Session
+- [x] T059 [US3] Implement resource monitoring in RDP module to track per-session memory usage, validate 3 concurrent sessions within 4GB RAM (3GB used, 1GB buffer) per performance-specs.md
+- [x] T060 [US3] Create integration test in `tests/integration/test_multi_session.bats` to simulate 3 concurrent RDP connections, verify session isolation (separate processes, separate X displays), test session reconnection preserves state, measure latency ≤120ms per performance-specs.md
 
 ### Session Management Utilities
 
-- [ ] T061 [US3] Create session management utility script to list active sessions, show resource usage per session, cleanup orphaned sessions
-- [ ] T062 [US3] Create performance test to validate concurrent session performance meets NFR-004
+- [x] T061 [US3] Create session management utility script to list active sessions, show resource usage per session, cleanup orphaned sessions
+- [x] T062 [US3] Create performance test to validate concurrent session performance meets NFR-004
 
 **US3 Acceptance**: 3 developers can work simultaneously without conflicts or lag
 
@@ -186,15 +186,15 @@
 
 ### Idempotency Implementation
 
-- [ ] T063 [US4] Enhance all modules to detect existing installations before installing, skip already-configured components, update vs fresh install logic per installation-specs.md §Idempotency
-- [ ] T064 [US4] Implement --force flag to clear checkpoints and re-provision from scratch
-- [ ] T065 [US4] Implement --resume flag to continue from last checkpoint after failure
-- [ ] T066 [US4] Create idempotency test in `tests/integration/test_idempotency.bats` to provision VPS twice, verify second run completes without errors in ≤5 minutes per SC-008, validate no configuration changes on second run
+- [x] T063 [US4] Enhance all modules to detect existing installations before installing, skip already-configured components, update vs fresh install logic per installation-specs.md §Idempotency
+- [x] T064 [US4] Implement --force flag to clear checkpoints and re-provision from scratch
+- [x] T065 [US4] Implement --resume flag to continue from last checkpoint after failure
+- [x] T066 [US4] Create idempotency test in `tests/integration/test_idempotency.bats` to provision VPS twice, verify second run completes without errors in ≤5 minutes per SC-008, validate no configuration changes on second run
 
 ### Consistency Verification
 
-- [ ] T067 [US4] Create consistency test to provision 3 VPS instances, collect system state (package versions, configurations, checksums), compare states across instances, verify 100% consistency
-- [ ] T068 [US4] Implement state comparison utility in `lib/utils/state-compare.sh` to generate system fingerprint, compare against baseline, report differences
+- [x] T067 [US4] Create consistency test to provision 3 VPS instances, collect system state (package versions, configurations, checksums), compare states across instances, verify 100% consistency
+- [x] T068 [US4] Implement state comparison utility in `lib/utils/state-compare.sh` to generate system fingerprint, compare against baseline, report differences
 
 **US4 Acceptance**: Multiple provisions yield identical environments, re-running is safe
 

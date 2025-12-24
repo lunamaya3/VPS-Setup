@@ -23,14 +23,15 @@ setup() {
   TEST_DIR="${BATS_TEST_TMPDIR}/user-permissions-test"
   mkdir -p "${TEST_DIR}"
   
-  # Source core libraries
-  source "${PROJECT_ROOT}/lib/core/logger.sh"
-  source "${PROJECT_ROOT}/lib/core/checkpoint.sh"
-  
-  # Set up test environment
+  # Set environment BEFORE sourcing libraries (they use readonly)
   export LOG_FILE="${TEST_DIR}/test.log"
+  export LOG_DIR="${TEST_DIR}"
   export CHECKPOINT_DIR="${TEST_DIR}/checkpoints"
   mkdir -p "${CHECKPOINT_DIR}"
+  
+  # Source core libraries (they'll use our environment)
+  source "${PROJECT_ROOT}/lib/core/logger.sh" 2>/dev/null || true
+  source "${PROJECT_ROOT}/lib/core/checkpoint.sh" 2>/dev/null || true
   
   # Determine test username
   TEST_USERNAME="${TEST_USERNAME:-devuser}"

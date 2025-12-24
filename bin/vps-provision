@@ -345,6 +345,18 @@ main() {
     config_load_default
   fi
   
+  # Initialize checkpoint system
+  checkpoint_init
+  
+  # Export mode flags for modules to use
+  export FORCE_MODE
+  export RESUME_MODE
+  
+  # Handle force mode - clear checkpoints if enabled
+  if [[ "${FORCE_MODE}" == "true" ]]; then
+    checkpoint_handle_force_mode
+  fi
+  
   # Initialize state
   log_info "Initializing provisioning session..."
   local session_id
