@@ -83,7 +83,7 @@ teardown() {
   run "${CLI_COMMAND}" --config /nonexistent/path/config.conf
   
   assert_failure
-  assert_output --partial "Configuration file not found"
+  assert_output --partial "Invalid configuration file path"
 }
 
 # Test: --log-level flag
@@ -123,19 +123,19 @@ teardown() {
   run "${CLI_COMMAND}" --username 123user
   
   assert_failure
-  assert_output --partial "Invalid username format"
+  assert_output --partial "Username is invalid"
   
   # Invalid: too short
   run "${CLI_COMMAND}" --username ab
   
   assert_failure
-  assert_output --partial "Invalid username format"
+  assert_output --partial "Username is invalid"
   
   # Invalid: contains uppercase
   run "${CLI_COMMAND}" --username UserName
   
   assert_failure
-  assert_output --partial "Invalid username format"
+  assert_output --partial "Username is invalid"
 }
 
 # Test: --output-format flag

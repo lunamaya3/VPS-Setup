@@ -24,9 +24,13 @@ readonly _TERMINAL_SETUP_SH_LOADED=1
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(dirname "${SCRIPT_DIR}")"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/logger.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/checkpoint.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/transaction.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/progress.sh"
 
 # Module constants
@@ -245,6 +249,7 @@ terminal_setup_apply_to_skel() {
     echo ""
   } >> "${skel_bashrc}"
   
+  # shellcheck disable=SC2181,SC2320
   if [[ $? -ne 0 ]]; then
     log_error "Failed to update ${skel_bashrc}"
     return 1
@@ -308,6 +313,7 @@ terminal_setup_apply_to_user() {
     echo ""
   } >> "${user_bashrc}"
   
+  # shellcheck disable=SC2181,SC2320
   if [[ $? -ne 0 ]]; then
     log_error "Failed to update ${user_bashrc}"
     return 1
@@ -333,7 +339,7 @@ terminal_setup_apply_to_existing_users() {
   local failed=0
   
   # Get list of non-system users (UID >= 1000)
-  while IFS=: read -r username _ uid _ _ home shell; do
+  while IFS=: read -r username _ uid _ _ _ shell; do
     if [[ "${uid}" -ge 1000 ]] && [[ "${shell}" == */bash ]]; then
       log_debug "Applying configuration to user: ${username}"
       

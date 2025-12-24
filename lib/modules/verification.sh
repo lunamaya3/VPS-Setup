@@ -10,7 +10,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(dirname "$SCRIPT_DIR")"
 
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/logger.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/checkpoint.sh"
 
 readonly VERIFICATION_PHASE="verification"

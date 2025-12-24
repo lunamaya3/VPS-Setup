@@ -1,4 +1,3 @@
-
 #!/bin/bash
 # RDP Multi-Session Performance Test
 # Validates that concurrent RDP sessions meet NFR-004 performance requirements
@@ -20,8 +19,10 @@
 set -euo pipefail
 
 # Test configuration
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+readonly PROJECT_ROOT
 readonly SESSION_MONITOR="${PROJECT_ROOT}/lib/utils/session-monitor.py"
 
 # Default parameters

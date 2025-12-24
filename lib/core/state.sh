@@ -19,7 +19,9 @@ readonly _STATE_SH_LOADED=1
 
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/logger.sh"
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/config.sh"
 
 # State directory paths

@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Shell Script Code Quality Standards
 
 ## Overview

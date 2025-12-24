@@ -119,7 +119,7 @@ transaction_get_rollback_commands() {
 # Clear transaction log
 transaction_clear() {
   if [[ -f "$TRANSACTION_LOG" ]]; then
-    > "$TRANSACTION_LOG"
+: > "$TRANSACTION_LOG"
     log_info "Transaction log cleared"
   fi
 }

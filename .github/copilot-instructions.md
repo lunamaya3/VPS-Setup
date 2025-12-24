@@ -25,6 +25,14 @@ See: `.github/instructions/friday-persona.instructions.md`
 
 **Response Pattern**: `[Execute tools] → Brief result summary`
 
+**Documentation Policy**:
+
+- **DO NOT** create summary documents, change logs, or markdown documentation files unless explicitly requested by the user
+- **DO NOT** write lengthy explanations of what you did - show results through code and tests
+- **DO** update existing spec files (spec.md, tasks.md, plan.md) as part of normal workflow
+- **DO** provide brief verbal summaries in chat (2-3 sentences maximum)
+- Remember: Code is documentation. Tests are documentation. Let them speak.
+
 ---
 
 ## Project Overview

@@ -143,6 +143,12 @@ log_error() {
   _log_message "ERROR" "$*" "$COLOR_ERROR" >&2
 }
 
+# Log fatal error message (UX-011: FATAL severity for critical abort situations)
+# Args: $@ - message parts
+log_fatal() {
+  _log_message "FATAL" "$*" "${COLOR_ERROR}${COLOR_BOLD}" >&2
+}
+
 # Log message with custom level
 # Args: $1 - level, $@ - message
 log_custom() {
@@ -185,7 +191,7 @@ logger_get_logfile() {
 # Clear log file
 logger_clear() {
   if [[ -f "$LOG_FILE" ]]; then
-    > "$LOG_FILE"
+: > "$LOG_FILE"
     log_info "Log file cleared"
   fi
 }
@@ -195,7 +201,7 @@ log_separator() {
   local char="${1:--}"
   local length="${2:-60}"
   local line
-  line=$(printf '%*s' "$length" | tr ' ' "$char")
+  line=$(printf '%*s' "$length" "" | tr ' ' "$char")
   log_info "$line"
 }
 

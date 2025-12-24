@@ -24,9 +24,13 @@ readonly _RDP_SERVER_SH_LOADED=1
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(dirname "${SCRIPT_DIR}")"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/logger.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/checkpoint.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/transaction.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/progress.sh"
 
 # Module constants
@@ -284,7 +288,8 @@ AlwaysGroupCheck=false
 X11DisplayOffset=10
 MaxSessions=50
 KillDisconnected=false
-IdleTimeLimit=0
+; SEC-016: Session timeout - 60 minutes (3600 seconds) idle timeout
+IdleTimeLimit=3600
 DisconnectedTimeLimit=0
 Policy=Default
 

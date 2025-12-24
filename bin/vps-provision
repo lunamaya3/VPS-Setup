@@ -18,6 +18,7 @@ PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
 # Source core libraries
 LIB_DIR="${PROJECT_ROOT}/lib"
 source "${LIB_DIR}/core/logger.sh"
+source "${LIB_DIR}/core/sanitize.sh"
 source "${LIB_DIR}/core/config.sh"
 source "${LIB_DIR}/core/validator.sh"
 source "${LIB_DIR}/core/checkpoint.sh"
@@ -25,6 +26,8 @@ source "${LIB_DIR}/core/transaction.sh"
 source "${LIB_DIR}/core/rollback.sh"
 source "${LIB_DIR}/core/progress.sh"
 source "${LIB_DIR}/core/state.sh"
+source "${LIB_DIR}/core/error-handler.sh"
+source "${LIB_DIR}/core/ux.sh"
 
 # Global variables
 DRY_RUN=false
@@ -55,6 +58,7 @@ DESCRIPTION:
 OPTIONS:
     -h, --help              Display this help message
     -v, --version           Display version information
+    -y, --yes               Skip confirmation prompts (auto-accept)
     
     --dry-run               Show planned actions without executing
     --skip-validation       Skip pre-flight system validation (not recommended)
@@ -68,7 +72,7 @@ OPTIONS:
                             Choices: DEBUG, INFO, WARNING, ERROR
                             Default: INFO
     
-    --no-color              Disable colored terminal output
+    --no-color, --plain     Disable colored terminal output
     
     --skip-phase PHASE      Skip specific provisioning phase(s)
                             Can be specified multiple times
@@ -161,6 +165,10 @@ parse_arguments() {
         show_version
         exit 0
         ;;
+      -y|--yes)
+        export UX_YES_MODE=true
+        shift
+        ;;
       --dry-run)
         DRY_RUN=true
         shift
@@ -182,11 +190,15 @@ parse_arguments() {
           log_error "Option --config requires an argument"
           exit 5
         fi
-        if [[ ! -f "$2" ]]; then
-          log_error "Configuration file not found: $2"
+        # SEC-018: Sanitize file path
+        if ! CUSTOM_CONFIG=$(sanitize_path "$2"); then
+          log_error "Invalid configuration file path"
           exit 5
         fi
-        CUSTOM_CONFIG="$2"
+        if [[ ! -f "$CUSTOM_CONFIG" ]]; then
+          log_error "Configuration file not found: $CUSTOM_CONFIG"
+          exit 5
+        fi
         shift 2
         ;;
       --log-level)
@@ -194,12 +206,16 @@ parse_arguments() {
           log_error "Option --log-level requires an argument"
           exit 5
         fi
-        LOG_LEVEL="$2"
+        # SEC-018: Sanitize log level
+        if ! LOG_LEVEL=$(sanitize_log_level "$2"); then
+          exit 5
+        fi
         shift 2
         ;;
-      --no-color)
+      --no-color|--plain)
         NO_COLOR=true
         export NO_COLOR=1
+        export ENABLE_COLORS=false
         shift
         ;;
       --skip-phase)
@@ -207,7 +223,12 @@ parse_arguments() {
           log_error "Option --skip-phase requires an argument"
           exit 5
         fi
-        SKIP_PHASES+=("$2")
+        # SEC-018: Sanitize phase name
+        local sanitized_phase
+        if ! sanitized_phase=$(sanitize_phase_name "$2"); then
+          exit 5
+        fi
+        SKIP_PHASES+=("$sanitized_phase")
         shift 2
         ;;
       --only-phase)
@@ -215,7 +236,12 @@ parse_arguments() {
           log_error "Option --only-phase requires an argument"
           exit 5
         fi
-        ONLY_PHASES+=("$2")
+        # SEC-018: Sanitize phase name
+        local sanitized_phase
+        if ! sanitized_phase=$(sanitize_phase_name "$2"); then
+          exit 5
+        fi
+        ONLY_PHASES+=("$sanitized_phase")
         shift 2
         ;;
       --username)
@@ -223,7 +249,10 @@ parse_arguments() {
           log_error "Option --username requires an argument"
           exit 5
         fi
-        CUSTOM_USERNAME="$2"
+        # SEC-018: Sanitize username
+        if ! CUSTOM_USERNAME=$(sanitize_username "$2"); then
+          exit 5
+        fi
         shift 2
         ;;
       --output-format)
@@ -231,7 +260,10 @@ parse_arguments() {
           log_error "Option --output-format requires an argument"
           exit 5
         fi
-        OUTPUT_FORMAT="$2"
+        # SEC-018: Sanitize output format
+        if ! OUTPUT_FORMAT=$(sanitize_output_format "$2"); then
+          exit 5
+        fi
         shift 2
         ;;
       *)
@@ -348,12 +380,24 @@ main() {
   # Initialize checkpoint system
   checkpoint_init
   
+  # Initialize UX system
+  ux_init
+  if [[ "${NO_COLOR}" == "true" ]]; then
+    logger_set_colors false
+  fi
+  
   # Export mode flags for modules to use
   export FORCE_MODE
   export RESUME_MODE
   
-  # Handle force mode - clear checkpoints if enabled
+  # Handle force mode - clear checkpoints if enabled (UX-009: confirm destructive operation)
   if [[ "${FORCE_MODE}" == "true" ]]; then
+    if ! confirm_action \
+      "Force mode will clear all checkpoints and re-provision from scratch. Continue?" \
+      "WARNING: This may overwrite existing configurations and reinstall packages."; then
+      log_info "Force mode cancelled by user"
+      exit 0
+    fi
     checkpoint_handle_force_mode
   fi
   

@@ -50,6 +50,18 @@ readonly -a EXIT_CODE_WHITELIST=(
   141  # SIGPIPE (broken pipe, often benign)
 )
 
+# Error suggestion mappings (UX-008: actionable suggestions)
+readonly -A ERROR_SUGGESTIONS=(
+  ["$E_NETWORK"]="Check internet connection and DNS resolution. Verify firewall rules."
+  ["$E_DISK"]="Free up disk space by removing unnecessary files or expanding storage."
+  ["$E_LOCK"]="Wait a moment and retry. Another package manager may be running."
+  ["$E_PKG_CORRUPT"]="Clear package cache with 'apt-get clean' and retry installation."
+  ["$E_PERMISSION"]="Ensure script is running with root/sudo privileges."
+  ["$E_NOT_FOUND"]="Install missing dependency or check command spelling."
+  ["$E_TIMEOUT"]="Increase timeout or check system load and network stability."
+  ["$E_UNKNOWN"]="Review error details above and check system logs."
+)
+
 # Initialize error handler
 error_handler_init() {
   log_debug "Error handler initialized"
@@ -119,21 +131,43 @@ error_classify() {
 
 # Get error severity based on error type
 # Args: $1 - error type
-# Returns: severity level
+# Returns: severity level (FATAL, ERROR, WARNING per UX-011)
 error_get_severity() {
   local error_type="$1"
   
   case "$error_type" in
     "$E_NETWORK"|"$E_LOCK"|"$E_TIMEOUT"|"$E_PKG_CORRUPT")
-      echo "$E_SEVERITY_RETRYABLE"
+      echo "ERROR"  # Retryable but still an error
       ;;
     "$E_DISK"|"$E_PERMISSION"|"$E_NOT_FOUND")
-      echo "$E_SEVERITY_CRITICAL"
+      echo "FATAL"  # Critical, abort immediately
       ;;
     *)
-      echo "$E_SEVERITY_WARNING"
+      echo "WARNING"  # Non-fatal informational
       ;;
   esac
+}
+
+# Get actionable suggestion for error type (UX-008)
+# Args: $1 - error type
+# Returns: suggestion text
+error_get_suggestion() {
+  local error_type="$1"
+  echo "${ERROR_SUGGESTIONS[$error_type]:-Review error details and consult documentation.}"
+}
+
+# Format standardized error message (UX-007)
+# Args: $1 - severity, $2 - message, $3 - suggestion (optional)
+# Output: [SEVERITY] <Message>\n > Suggested Action
+error_format_message() {
+  local severity="$1"
+  local message="$2"
+  local suggestion="${3:-}"
+  
+  echo "[$severity] $message"
+  if [[ -n "$suggestion" ]]; then
+    echo " > $suggestion"
+  fi
 }
 
 # Check if exit code is whitelisted
@@ -152,7 +186,7 @@ error_exit_code_whitelisted() {
   return 1
 }
 
-# Validate command exit code
+# Validate command exit code with formatted error output (UX-007, UX-008, UX-011)
 # Args: $1 - exit code, $2 - command description, $3 - stderr, $4 - stdout
 # Returns: 0 if valid, 1 otherwise
 error_validate_exit_code() {
@@ -166,15 +200,24 @@ error_validate_exit_code() {
     return 0
   fi
   
-  log_error "$description failed with exit code: $exit_code"
-  
   local error_type
   error_type=$(error_classify "$exit_code" "$stderr" "$stdout")
   
   local severity
   severity=$(error_get_severity "$error_type")
   
-  log_error "Error type: $error_type, Severity: $severity"
+  local suggestion
+  suggestion=$(error_get_suggestion "$error_type")
+  
+  # Format and log standardized error message (UX-007)
+  local formatted_error
+  formatted_error=$(error_format_message "$severity" "$description failed with exit code $exit_code (Type: $error_type)" "$suggestion")
+  
+  if [[ "$severity" == "FATAL" ]]; then
+    log_fatal "$formatted_error"
+  else
+    log_error "$formatted_error"
+  fi
   
   if [[ -n "$stderr" ]]; then
     log_error "Error output: $stderr"
@@ -353,31 +396,6 @@ error_get_suggestion() {
       echo "Review error output, check logs for details, consult documentation"
       ;;
   esac
-}
-
-# Format error message with context and suggestion
-# Args: $1 - error type, $2 - description, $3 - stderr, $4 - exit code
-error_format_message() {
-  local error_type="$1"
-  local description="$2"
-  local stderr="${3:-}"
-  local exit_code="${4:-}"
-  
-  local severity
-  severity=$(error_get_severity "$error_type")
-  
-  local suggestion
-  suggestion=$(error_get_suggestion "$error_type")
-  
-  log_error "[$severity] $description"
-  log_error "Error Type: $error_type"
-  if [[ -n "$exit_code" ]]; then
-    log_error "Exit Code: $exit_code"
-  fi
-  if [[ -n "$stderr" ]]; then
-    log_error "Output: $stderr"
-  fi
-  log_error "Suggested Action: $suggestion"
 }
 
 # Wrapper function for safe command execution with all protections

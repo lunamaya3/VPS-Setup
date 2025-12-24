@@ -9,7 +9,6 @@ set -euo pipefail
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 NC='\033[0m'
 
 TESTS_PASSED=0
@@ -107,7 +106,7 @@ fi
 
 # SC-006: Completion time ≤15 minutes
 echo "Testing SC-006: Completion time..."
-if [[ -f "/var/log/vps-provision/provision-"*".log" ]]; then
+if compgen -G "/var/log/vps-provision/provision-*.log" > /dev/null; then
   test_result "SC-006: Provisioning log exists" "pass"
 else
   test_result "SC-006: Provisioning log exists" "fail"

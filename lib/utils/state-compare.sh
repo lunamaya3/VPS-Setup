@@ -26,6 +26,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(dirname "${SCRIPT_DIR}")"
 
 # Source dependencies
+# shellcheck disable=SC1091
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/logger.sh"
 
 # Constants
@@ -112,7 +114,7 @@ generate_package_fingerprint() {
   echo ""
   
   echo "--- Package Count ---"
-  dpkg -l | grep '^ii' | wc -l
+  dpkg -l | grep -c '^ii'
   echo ""
 }
 
@@ -273,6 +275,7 @@ generate_system_info() {
   echo ""
   
   echo "--- OS Version ---"
+# shellcheck disable=SC2002
   cat /etc/os-release | grep -E "^(NAME|VERSION)" | sort
   echo ""
   

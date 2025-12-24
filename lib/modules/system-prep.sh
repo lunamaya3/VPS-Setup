@@ -24,9 +24,13 @@ readonly _SYSTEM_PREP_SH_LOADED=1
 # Source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(dirname "${SCRIPT_DIR}")"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/logger.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/checkpoint.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/transaction.sh"
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/progress.sh"
 
 # Module constants
@@ -325,8 +329,11 @@ Subsystem sftp /usr/lib/openssh/sftp-server
 StrictModes yes
 MaxAuthTries 3
 MaxSessions 10
-ClientAliveInterval 300
-ClientAliveCountMax 2
+
+# SEC-016: Session timeout - 60 minutes (3600 seconds) idle timeout
+# ClientAliveInterval 900s (15 min) * ClientAliveCountMax 4 = 3600s (60 min) total
+ClientAliveInterval 900
+ClientAliveCountMax 4
 LoginGraceTime 60
 
 # Logging

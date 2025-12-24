@@ -10,7 +10,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(dirname "$SCRIPT_DIR")"
 
+# shellcheck disable=SC1091
 source "${LIB_DIR}/core/logger.sh"
+source "${LIB_DIR}/core/ux.sh"
 
 readonly REPORT_DIR="/var/vps-provision/reports"
 
@@ -110,5 +112,22 @@ JSON_EOF
   return 0
 }
 
-# Export function
+# Display success summary with connection details (UX-010)
+# Args: $1 - username, $2 - password
+display_success_summary() {
+  local username="${1:-devuser}"
+  local password="${2:-[REDACTED]}"
+  
+  # Get IP address
+  local ip_address
+  ip_address=$(hostname -I | awk '{print $1}' || echo "UNKNOWN")
+  
+  # Display success banner
+  show_success_banner "$ip_address" "3389" "$username" "$password"
+  
+  return 0
+}
+
+# Export functions
 export -f generate_summary_report
+export -f display_success_summary

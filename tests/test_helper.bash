@@ -3,7 +3,8 @@
 # Common functions and assertions for all test suites
 
 # Set PROJECT_ROOT for all tests (works from any subdirectory)
-export PROJECT_ROOT="$(cd "${BATS_TEST_DIRNAME:-$(dirname "$0")}" && git rev-parse --show-toplevel 2>/dev/null || echo "${BATS_TEST_DIRNAME:-$(dirname "$0")}/../..")"
+export PROJECT_ROOT
+PROJECT_ROOT="$(cd "${BATS_TEST_DIRNAME:-$(dirname "$0")}" && git rev-parse --show-toplevel 2>/dev/null || echo "${BATS_TEST_DIRNAME:-$(dirname "$0")}/../..")"
 
 # Load bats support libraries if available
 if [[ -d "${BATS_TEST_DIRNAME}/../node_modules/bats-support" ]]; then
@@ -12,8 +13,10 @@ if [[ -d "${BATS_TEST_DIRNAME}/../node_modules/bats-support" ]]; then
 else
   # Provide minimal assert functions if bats-assert not available
   assert_success() {
+    # shellcheck disable=SC2154
     if [[ "${status}" -ne 0 ]]; then
       echo "Expected success but got status: ${status}" >&2
+      # shellcheck disable=SC2154
       echo "Output: ${output}" >&2
       return 1
     fi
@@ -29,6 +32,7 @@ else
   assert_failure() {
     if [[ "${status}" -eq 0 ]]; then
       echo "Expected failure but got success" >&2
+      # shellcheck disable=SC2154
       echo "Output: ${output}" >&2
       return 1
     fi
@@ -199,10 +203,11 @@ fi
 # Common test setup
 common_setup() {
   # Set up temporary directory for tests
-  export TEST_TEMP_DIR="$(mktemp -d)"
+  export TEST_TEMP_DIR
+  TEST_TEMP_DIR="$(mktemp -d)"
   
   # Ensure cleanup on exit
-  trap "rm -rf '${TEST_TEMP_DIR}'" EXIT
+  trap 'rm -rf "${TEST_TEMP_DIR}"' EXIT
 }
 
 # Common test teardown
@@ -241,8 +246,16 @@ EOF
   export PATH="${TEST_TEMP_DIR}/bin:${PATH}"
 }
 
+# Helper: Skip if not root
+skip_if_not_root() {
+  if [[ "$(id -u)" -ne 0 ]]; then
+    skip "Test requires root privileges"
+  fi
+}
+
 # Export functions
 export -f common_setup
 export -f common_teardown
 export -f create_mock_file
 export -f mock_command
+export -f skip_if_not_root

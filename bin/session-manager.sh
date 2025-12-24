@@ -17,8 +17,10 @@
 set -euo pipefail
 
 # Configuration
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly LIB_DIR="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+readonly SCRIPT_DIR
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly LIB_DIR
+LIB_DIR="$(dirname "$(dirname "${SCRIPT_DIR}")")"
 readonly SESSION_MONITOR="${LIB_DIR}/lib/utils/session-monitor.py"
 
 # Colors for output
@@ -75,6 +77,7 @@ cmd_list() {
   # Get list of Xorg processes (xrdp sessions)
   local session_count=0
   
+  # shellcheck disable=SC2009
   while IFS= read -r line; do
     if [[ -z "$line" ]]; then
       continue
@@ -134,7 +137,7 @@ cmd_stats() {
   
   # Count sessions
   local session_count
-  session_count=$(ps aux | grep -c '[X]org.*:[0-9]' || echo 0)
+  session_count=$(pgrep -c -f "Xorg.*:[0-9]" || echo 0)
   
   # System uptime
   local uptime_info
@@ -286,7 +289,7 @@ cmd_kill() {
   
   # Find process with this display
   local pid
-  pid=$(ps aux | grep "[X]org.*${target_display}" | awk '{print $2}' | head -1)
+  pid=$(pgrep -a "Xorg" | grep "${target_display}" | awk '{print $1}' | head -1)
   
   if [[ -z "${pid}" ]]; then
     print_color "${COLOR_RED}" "✗ No session found for display ${target_display}"

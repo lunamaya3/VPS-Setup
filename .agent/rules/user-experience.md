@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # User Experience Standards
 
 ## Overview

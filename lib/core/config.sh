@@ -23,7 +23,8 @@ if [[ -z "${USER_CONFIG:-}" ]]; then
   readonly USER_CONFIG="${HOME}/.vps-provision.conf"
 fi
 if [[ -z "${PROJECT_CONFIG:-}" ]]; then
-  readonly PROJECT_CONFIG="$(dirname "$SCRIPT_DIR")/../config/default.conf"
+  PROJECT_CONFIG="$(dirname "$SCRIPT_DIR")/../config/default.conf"
+  readonly PROJECT_CONFIG
 fi
 
 # Configuration variables (will be populated from config files)

@@ -6,19 +6,28 @@ load '../test_helper'
 
 setup() {
   export TEST_DIR="${BATS_TEST_TMPDIR}/resource_test"
+  export LIB_DIR="${BATS_TEST_DIRNAME}/../../lib"
   
   mkdir -p "$TEST_DIR"
   
   # Set LOG_FILE BEFORE sourcing logger.sh (it uses readonly)
   export LOG_FILE="${TEST_DIR}/test.log"
   export LOG_DIR="${TEST_DIR}"
+  touch "${LOG_FILE}"
   
-  # Source modules (suppress readonly errors)
-  source "${LIB_DIR}/core/logger.sh" 2>/dev/null || true
+  # Mock logging functions to prevent issues with readonly variables
+  log_info() { echo "[INFO] $*" >> "${LOG_FILE}"; }
+  log_error() { echo "[ERROR] $*" >> "${LOG_FILE}"; }
+  log_warning() { echo "[WARNING] $*" >> "${LOG_FILE}"; }
+  log_debug() { echo "[DEBUG] $*" >> "${LOG_FILE}"; }
+  export -f log_info log_error log_warning log_debug
+  
+  # Source validator module (will use our mocked log functions)
+  # Unset the sourcing guard to allow re-sourcing in tests
+  unset _VALIDATOR_SH_LOADED 2>/dev/null || true
   source "${LIB_DIR}/core/validator.sh" 2>/dev/null || true
   
-  # Initialize if functions exist
-  type logger_init &>/dev/null && logger_init 2>/dev/null || true
+  # Initialize validator
   type validator_init &>/dev/null && validator_init 2>/dev/null || true
 }
 

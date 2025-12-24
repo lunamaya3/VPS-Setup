@@ -26,7 +26,8 @@ source "${SCRIPT_DIR}/logger.sh"
 
 # Lock configuration
 readonly LOCK_FILE="${LOCK_FILE:-/var/lock/vps-provision.lock}"
-readonly LOCK_DIR=$(dirname "$LOCK_FILE")
+LOCK_DIR=$(dirname "$LOCK_FILE")
+readonly LOCK_DIR
 readonly LOCK_TIMEOUT="${LOCK_TIMEOUT:-300}"  # 5 minutes
 
 # Current lock state

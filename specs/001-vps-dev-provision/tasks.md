@@ -279,32 +279,32 @@
 
 ### TLS & Encryption
 
-- [ ] T091 Enhance RDP module to generate 4096-bit RSA self-signed certificate per SEC-007, configure xrdp for high TLS encryption level per SEC-008
-- [ ] T092 Verify TLS certificate generation and RDP encryption in integration test
+- [x] T091 Enhance RDP module to generate 4096-bit RSA self-signed certificate per SEC-007, configure xrdp for high TLS encryption level per SEC-008
+- [x] T092 Verify TLS certificate generation and RDP encryption in integration test
 
 ### Access Control & Isolation
 
-- [ ] T093 Implement session isolation verification per SEC-009: separate user namespaces, isolated processes, file permission checks
-- [ ] T094 Configure sudo with lecture="always" per SEC-010
+- [x] T093 Implement session isolation verification per SEC-009: separate user namespaces, isolated processes, file permission checks
+- [x] T094 Configure sudo with lecture="always" per SEC-010
 
 ### Network Security
 
-- [ ] T095 Enhance firewall configuration: default DENY all incoming per SEC-011, explicitly ALLOW only ports 22, 3389 per SEC-012
-- [ ] T096 Install and configure fail2ban per SEC-013: monitor SSH and RDP logs, ban IPs after 5 failed attempts in 10 minutes
-- [ ] T097 Create security test to verify firewall rules, test fail2ban functionality
+- [x] T095 Enhance firewall configuration: default DENY all incoming per SEC-011, explicitly ALLOW only ports 22, 3389 per SEC-012
+- [x] T096 Install and configure fail2ban per SEC-013: monitor SSH and RDP logs, ban IPs after 5 failed attempts in 10 minutes
+- [x] T097 Create security test to verify firewall rules, test fail2ban functionality
 
 ### Logging & Auditing
 
-- [ ] T098 Configure auditd for sudo logging per SEC-014, 30-day retention
-- [ ] T099 Verify auth.log captures authentication failures per SEC-015
-- [ ] T100 Create audit log verification test
+- [x] T098 Configure auditd for sudo logging per SEC-014, 30-day retention
+- [x] T099 Verify auth.log captures authentication failures per SEC-015
+- [x] T100 Create audit log verification test
 
 ### Threat Mitigation
 
-- [ ] T101 Configure session timeouts (60 min idle) for RDP and SSH per SEC-016
-- [ ] T102 Implement GPG signature verification for VSCode, Cursor packages per SEC-017
-- [ ] T103 Implement input sanitization in all user-facing functions per SEC-018
-- [ ] T104 Create security penetration test to validate all security controls
+- [x] T101 Configure session timeouts (60 min idle) for RDP and SSH per SEC-016
+- [x] T102 Implement GPG signature verification for VSCode, Cursor packages per SEC-017
+- [x] T103 Implement input sanitization in all user-facing functions per SEC-018
+- [x] T104 Create security penetration test to validate all security controls
 
 **Checkpoint**: All security requirements implemented
 
@@ -316,19 +316,19 @@
 
 ### Progress Reporting
 
-- [ ] T105 Enhance progress tracker to display percentage (0-100%) per UX-001, estimate remaining time per UX-002, update every 2 seconds per UX-003
-- [ ] T106 Implement visual hierarchy: bold current step, dimmed completed, normal pending per UX-004
-- [ ] T107 Implement progress persistence to survive crashes per UX-005
-- [ ] T108 Implement duration warning when step exceeds 150% of estimate per UX-006
+- [x] T105 Enhance progress tracker to display percentage (0-100%) per UX-001, estimate remaining time per UX-002, update every 2 seconds per UX-003
+- [x] T106 Implement visual hierarchy: bold current step, dimmed completed, normal pending per UX-004
+- [x] T107 Implement progress persistence to survive crashes per UX-005
+- [x] T108 Implement duration warning when step exceeds 150% of estimate per UX-006
 
 ### Error Handling & Feedback
 
-- [ ] T109 Standardize error messages: `[SEVERITY] <Message>\n > Suggested Action` per UX-007
-- [ ] T110 Implement actionable suggestions for all known errors per UX-008
-- [ ] T111 Implement confirmation prompts for destructive operations (--yes bypass) per UX-009
-- [ ] T112 Create success banner with connection details in copy-paste format per UX-010
-- [ ] T113 Implement error severity classification (FATAL, ERROR, WARNING) per UX-011
-- [ ] T114 Validate all user inputs with specific feedback per UX-012
+- [x] T109 Standardize error messages: `[SEVERITY] <Message>\n > Suggested Action` per UX-007
+- [x] T110 Implement actionable suggestions for all known errors per UX-008
+- [x] T111 Implement confirmation prompts for destructive operations (--yes bypass) per UX-009
+- [x] T112 Create success banner with connection details in copy-paste format per UX-010
+- [x] T113 Implement error severity classification (FATAL, ERROR, WARNING) per UX-011
+- [x] T114 Validate all user inputs with specific feedback per UX-012
 
 ### Command-Line Usability
 
