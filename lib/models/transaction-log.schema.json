@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://vps-provision/schemas/transaction-log.json",
+  "title": "TransactionLog",
+  "description": "Schema for transaction log entries used in rollback",
+  "type": "object",
+  "required": [
+    "sequence_number",
+    "timestamp",
+    "action_type",
+    "target",
+    "rollback_command"
+  ],
+  "properties": {
+    "sequence_number": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Order of execution (for LIFO rollback)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When transaction occurred"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "PACKAGE_INSTALL",
+        "PACKAGE_REMOVE",
+        "FILE_MODIFY",
+        "FILE_CREATE",
+        "SERVICE_ENABLE",
+        "SERVICE_START",
+        "USER_CREATE",
+        "USER_MODIFY",
+        "COMMAND_EXEC"
+      ],
+      "description": "Type of action performed"
+    },
+    "target": {
+      "type": "string",
+      "description": "Subject of action (package name, file path, service name)"
+    },
+    "rollback_command": {
+      "type": "string",
+      "description": "Exact command to reverse action"
+    },
+    "executed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether rollback has been executed"
+    },
+    "output": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Command output (truncated)"
+    }
+  }
+}

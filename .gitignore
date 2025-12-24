@@ -1,0 +1,54 @@
+# VPS Provision - Generated files and artifacts
+
+# Logs and runtime data
+*.log
+*.log.*
+/var/log/vps-provision/
+logs/
+*.tmp
+*.swp
+*.swo
+
+# Test artifacts
+coverage/
+.coverage
+htmlcov/
+*.pyc
+__pycache__/
+.pytest_cache/
+.bats-*/
+
+# Temporary files
+tmp/
+temp/
+*.bak
+*.backup
+~*
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.sublime-*
+.DS_Store
+Thumbs.db
+
+# Environment and configuration
+.env
+.env.*
+*.local.conf
+/var/vps-provision/sessions/
+/var/vps-provision/checkpoints/
+/var/vps-provision/backups/
+
+# Package manager
+node_modules/
+vendor/
+
+# Lock files
+*.lock
+.vps-provision.lock

@@ -22,13 +22,13 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create project directory structure per plan.md: `vps-provision/{bin,lib/{core,modules,utils},config,tests/{unit,integration,contract,e2e},docs}`
-- [ ] T002 Initialize Git repository and create `.gitignore` for logs, temp files, and test artifacts
-- [ ] T003 [P] Create `README.md` with project overview, quick start guide, and installation instructions
-- [ ] T004 [P] Create `Makefile` with targets: `install`, `test`, `clean`, `lint` for build automation
-- [ ] T005 Create configuration template in `config/default.conf` with default values for all configurable options
-- [ ] T006 [P] Setup bats-core test framework and create `.bats-version` file
-- [ ] T007 [P] Create `.editorconfig` for consistent code formatting across team
+- [X] T001 Create project directory structure per plan.md: `vps-provision/{bin,lib/{core,modules,utils},config,tests/{unit,integration,contract,e2e},docs}`
+- [X] T002 Initialize Git repository and create `.gitignore` for logs, temp files, and test artifacts
+- [X] T003 [P] Create `README.md` with project overview, quick start guide, and installation instructions
+- [X] T004 [P] Create `Makefile` with targets: `install`, `test`, `clean`, `lint` for build automation
+- [X] T005 Create configuration template in `config/default.conf` with default values for all configurable options
+- [X] T006 [P] Setup bats-core test framework and create `.bats-version` file
+- [X] T007 [P] Create `.editorconfig` for consistent code formatting across team
 
 ---
 
@@ -40,34 +40,34 @@
 
 ### Core Library Components
 
-- [ ] T008 Implement logging framework in `lib/core/logger.sh` with log levels (DEBUG, INFO, WARNING, ERROR), file output to `/var/log/vps-provision/`, console formatting with colors
-- [ ] T009 Implement progress tracking in `lib/core/progress.sh` with phase tracking, percentage calculation, time estimation, visual indicators (spinners, progress bars)
-- [ ] T010 Implement checkpoint mechanism in `lib/core/checkpoint.sh` with create, check, validate, clear functions for idempotency support
-- [ ] T011 Implement configuration manager in `lib/core/config.sh` to read default.conf, support custom config files, validate configuration values
-- [ ] T012 Implement transaction logger in `lib/core/transaction.sh` for recording all actions with rollback commands in LIFO format
-- [ ] T013 Implement rollback engine in `lib/core/rollback.sh` to parse transaction log, execute rollback commands in reverse order, verify system state after rollback
+- [X] T008 Implement logging framework in `lib/core/logger.sh` with log levels (DEBUG, INFO, WARNING, ERROR), file output to `/var/log/vps-provision/`, console formatting with colors
+- [X] T009 Implement progress tracking in `lib/core/progress.sh` with phase tracking, percentage calculation, time estimation, visual indicators (spinners, progress bars)
+- [X] T010 Implement checkpoint mechanism in `lib/core/checkpoint.sh` with create, check, validate, clear functions for idempotency support
+- [X] T011 Implement configuration manager in `lib/core/config.sh` to read default.conf, support custom config files, validate configuration values
+- [X] T012 Implement transaction logger in `lib/core/transaction.sh` for recording all actions with rollback commands in LIFO format
+- [X] T013 Implement rollback engine in `lib/core/rollback.sh` to parse transaction log, execute rollback commands in reverse order, verify system state after rollback
 
 ### System Validation
 
-- [ ] T014 Implement pre-flight validator in `lib/core/validator.sh` to check OS version (Debian 13), verify minimum resources (2GB RAM, 1 vCPU, 25GB disk), test network connectivity, validate package repositories
-- [ ] T015 Create unit tests in `tests/unit/test_validator.bats` for all validation functions with mocked system calls
+- [X] T014 Implement pre-flight validator in `lib/core/validator.sh` to check OS version (Debian 13), verify minimum resources (2GB RAM, 1 vCPU, 25GB disk), test network connectivity, validate package repositories
+- [X] T015 Create unit tests in `tests/unit/test_validator.bats` for all validation functions with mocked system calls
 
 ### Data Models & State Management
 
-- [ ] T016 Create JSON schemas in `lib/models/` for ProvisioningSession, PhaseExecution, ProvisioningAction, VPSInstance, DeveloperUser per data-model.md
-- [ ] T017 Implement state persistence in `lib/core/state.sh` to save/load session state to `/var/vps-provision/sessions/`, read/write phase state, manage checkpoint files
+- [X] T016 Create JSON schemas in `lib/models/` for ProvisioningSession, PhaseExecution, ProvisioningAction, VPSInstance, DeveloperUser per data-model.md
+- [X] T017 Implement state persistence in `lib/core/state.sh` to save/load session state to `/var/vps-provision/sessions/`, read/write phase state, manage checkpoint files
 
 ### Python Utilities
 
-- [ ] T018 [P] Create Python utility in `lib/utils/package-manager.py` for advanced APT operations, dependency resolution, package verification
-- [ ] T019 [P] Create credential generator in `lib/utils/credential-gen.py` with CSPRNG password generation (16+ chars, mixed case, numbers, symbols), secure display formatting
-- [ ] T020 [P] Create health check utility in `lib/utils/health-check.py` for post-installation validation of all components
+- [X] T018 [P] Create Python utility in `lib/utils/package-manager.py` for advanced APT operations, dependency resolution, package verification
+- [X] T019 [P] Create credential generator in `lib/utils/credential-gen.py` with CSPRNG password generation (16+ chars, mixed case, numbers, symbols), secure display formatting
+- [X] T020 [P] Create health check utility in `lib/utils/health-check.py` for post-installation validation of all components
 
 ### CLI Interface Foundation
 
-- [ ] T021 Implement main CLI entry point in `bin/vps-provision` with argument parsing, help/version display, configuration loading, session initialization
-- [ ] T022 Create contract test suite in `tests/contract/test_cli_interface.bats` to validate all CLI flags per contracts/cli-interface.json
-- [ ] T023 Implement dry-run mode to show planned actions without execution, display checkpoint status, estimate duration
+- [X] T021 Implement main CLI entry point in `bin/vps-provision` with argument parsing, help/version display, configuration loading, session initialization
+- [X] T022 Create contract test suite in `tests/contract/test_cli_interface.bats` to validate all CLI flags per contracts/cli-interface.json
+- [X] T023 Implement dry-run mode to show planned actions without execution, display checkpoint status, estimate duration
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -81,9 +81,9 @@
 
 ### System Preparation Module
 
-- [ ] T024 [US1] Implement system prep module in `lib/modules/system-prep.sh` to update APT package lists, upgrade existing packages, install build-essential, curl, wget, git, configure unattended-upgrades
-- [ ] T025 [US1] Create integration test in `tests/integration/test_system_prep.bats` to verify all packages installed, validate unattended-upgrades configuration
-- [ ] T026 [US1] Implement checkpoint creation for system-prep phase
+- [X] T024 [US1] Implement system prep module in `lib/modules/system-prep.sh` to update APT package lists, upgrade existing packages, install build-essential, curl, wget, git, configure unattended-upgrades
+- [X] T025 [US1] Create integration test in `tests/integration/test_system_prep.bats` to verify all packages installed, validate unattended-upgrades configuration
+- [X] T026 [US1] Implement checkpoint creation for system-prep phase
 
 ### Desktop Environment Module
 

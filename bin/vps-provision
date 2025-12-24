@@ -1,0 +1,557 @@
+#!/bin/bash
+# VPS Developer Workstation Provisioning Tool
+# Main CLI entry point for automated provisioning of Debian 13 VPS
+#
+# Usage: vps-provision [OPTIONS]
+# See: vps-provision --help for full documentation
+
+set -euo pipefail
+
+# Version information
+readonly VERSION="1.0.0"
+readonly BUILD_DATE="2025-12-24"
+
+# Determine script location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
+
+# Source core libraries
+LIB_DIR="${PROJECT_ROOT}/lib"
+source "${LIB_DIR}/core/logger.sh"
+source "${LIB_DIR}/core/config.sh"
+source "${LIB_DIR}/core/validator.sh"
+source "${LIB_DIR}/core/checkpoint.sh"
+source "${LIB_DIR}/core/transaction.sh"
+source "${LIB_DIR}/core/rollback.sh"
+source "${LIB_DIR}/core/progress.sh"
+source "${LIB_DIR}/core/state.sh"
+
+# Global variables
+DRY_RUN=false
+SKIP_VALIDATION=false
+RESUME_MODE=false
+FORCE_MODE=false
+OUTPUT_FORMAT="text"
+LOG_LEVEL="INFO"
+NO_COLOR=false
+CUSTOM_CONFIG=""
+CUSTOM_USERNAME=""
+SKIP_PHASES=()
+ONLY_PHASES=()
+
+# Display help message
+show_help() {
+  cat <<'EOF'
+VPS Developer Workstation Provisioning Tool
+
+USAGE:
+    vps-provision [OPTIONS]
+
+DESCRIPTION:
+    Automates the provisioning of a fresh Digital Ocean Debian 13 VPS into a
+    fully-functional developer workstation with desktop environment, RDP access,
+    multiple IDEs, and development tools.
+
+OPTIONS:
+    -h, --help              Display this help message
+    -v, --version           Display version information
+    
+    --dry-run               Show planned actions without executing
+    --skip-validation       Skip pre-flight system validation (not recommended)
+    --resume                Resume from last checkpoint after failure
+    --force                 Force re-provisioning (ignore checkpoints)
+    
+    -c, --config PATH       Path to custom configuration file
+                            Default: /etc/vps-provision/config.conf
+    
+    --log-level LEVEL       Set logging verbosity
+                            Choices: DEBUG, INFO, WARNING, ERROR
+                            Default: INFO
+    
+    --no-color              Disable colored terminal output
+    
+    --skip-phase PHASE      Skip specific provisioning phase(s)
+                            Can be specified multiple times
+    
+    --only-phase PHASE      Run only specific phase(s)
+                            Can be specified multiple times
+                            Conflicts with --skip-phase
+    
+    --username NAME         Custom username for developer account
+                            Default: devuser
+                            Must match: ^[a-z][a-z0-9_-]{2,31}$
+    
+    --output-format FORMAT  Output format for results
+                            Choices: text, json
+                            Default: text
+
+VALID PHASES:
+    system-prep             System preparation and updates
+    desktop-install         XFCE desktop environment
+    rdp-config              RDP server configuration
+    user-creation           Developer user provisioning
+    ide-vscode              Visual Studio Code installation
+    ide-cursor              Cursor IDE installation
+    ide-antigravity         Antigravity IDE installation
+    terminal-setup          Terminal enhancements and shell configuration
+    dev-tools               Development tools installation
+    verification            Post-installation validation
+
+EXIT CODES:
+    0    SUCCESS                Provisioning completed successfully
+    1    VALIDATION_FAILED      Pre-flight validation failed
+    2    PROVISIONING_FAILED    Provisioning failed during execution
+    3    ROLLBACK_FAILED        Provisioning and rollback both failed
+    4    VERIFICATION_FAILED    Provisioning completed but verification failed
+    5    CONFIG_ERROR           Configuration file invalid or unreadable
+    6    PERMISSION_DENIED      Insufficient permissions (must run as root)
+    127  COMMAND_NOT_FOUND      Required command or dependency not found
+
+EXAMPLES:
+    # Basic provisioning with defaults
+    vps-provision
+    
+    # Dry run to preview actions
+    vps-provision --dry-run
+    
+    # Resume after failure
+    vps-provision --resume
+    
+    # Custom username with debug logging
+    vps-provision --username alice --log-level DEBUG
+    
+    # Install only VSCode and Cursor
+    vps-provision --only-phase ide-vscode --only-phase ide-cursor
+    
+    # JSON output for automation
+    vps-provision --output-format json > result.json
+
+ENVIRONMENT VARIABLES:
+    VPS_PROVISION_CONFIG     Override default config file location
+    VPS_PROVISION_LOG_DIR    Override default log directory
+    VPS_PROVISION_NO_COLOR   Disable colored output (set to any value)
+
+PREREQUISITES:
+    - Must run as root or with sudo
+    - Debian 13 (Bookworm) only
+    - Active internet connection
+    - Minimum 10GB disk space available
+    - Minimum 2GB RAM
+
+For more information, see documentation in ${PROJECT_ROOT}/docs/
+EOF
+}
+
+# Display version information
+show_version() {
+  echo "vps-provision version ${VERSION}"
+  echo "Build date: ${BUILD_DATE}"
+  echo "Project: VPS Developer Workstation Provisioning"
+}
+
+# Parse command-line arguments
+parse_arguments() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -h|--help)
+        show_help
+        exit 0
+        ;;
+      -v|--version)
+        show_version
+        exit 0
+        ;;
+      --dry-run)
+        DRY_RUN=true
+        shift
+        ;;
+      --skip-validation)
+        SKIP_VALIDATION=true
+        shift
+        ;;
+      --resume)
+        RESUME_MODE=true
+        shift
+        ;;
+      --force)
+        FORCE_MODE=true
+        shift
+        ;;
+      -c|--config)
+        if [[ -z "${2:-}" ]]; then
+          log_error "Option --config requires an argument"
+          exit 5
+        fi
+        if [[ ! -f "$2" ]]; then
+          log_error "Configuration file not found: $2"
+          exit 5
+        fi
+        CUSTOM_CONFIG="$2"
+        shift 2
+        ;;
+      --log-level)
+        if [[ -z "${2:-}" ]]; then
+          log_error "Option --log-level requires an argument"
+          exit 5
+        fi
+        LOG_LEVEL="$2"
+        shift 2
+        ;;
+      --no-color)
+        NO_COLOR=true
+        export NO_COLOR=1
+        shift
+        ;;
+      --skip-phase)
+        if [[ -z "${2:-}" ]]; then
+          log_error "Option --skip-phase requires an argument"
+          exit 5
+        fi
+        SKIP_PHASES+=("$2")
+        shift 2
+        ;;
+      --only-phase)
+        if [[ -z "${2:-}" ]]; then
+          log_error "Option --only-phase requires an argument"
+          exit 5
+        fi
+        ONLY_PHASES+=("$2")
+        shift 2
+        ;;
+      --username)
+        if [[ -z "${2:-}" ]]; then
+          log_error "Option --username requires an argument"
+          exit 5
+        fi
+        CUSTOM_USERNAME="$2"
+        shift 2
+        ;;
+      --output-format)
+        if [[ -z "${2:-}" ]]; then
+          log_error "Option --output-format requires an argument"
+          exit 5
+        fi
+        OUTPUT_FORMAT="$2"
+        shift 2
+        ;;
+      *)
+        log_error "Unknown option: $1"
+        echo "Run 'vps-provision --help' for usage information"
+        exit 5
+        ;;
+    esac
+  done
+  
+  # Validate conflicting options
+  if [[ ${#SKIP_PHASES[@]} -gt 0 && ${#ONLY_PHASES[@]} -gt 0 ]]; then
+    log_error "Options --skip-phase and --only-phase cannot be used together"
+    exit 5
+  fi
+  
+  if [[ "${RESUME_MODE}" == "true" && "${FORCE_MODE}" == "true" ]]; then
+    log_error "Options --resume and --force cannot be used together"
+    exit 5
+  fi
+}
+
+# Validate prerequisites
+check_prerequisites() {
+  log_info "Checking prerequisites..."
+  
+  # Validate username format if provided
+  if [[ -n "${CUSTOM_USERNAME}" ]]; then
+    if ! [[ "${CUSTOM_USERNAME}" =~ ^[a-z][a-z0-9_-]{2,31}$ ]]; then
+      log_error "Invalid username format: ${CUSTOM_USERNAME}"
+      log_error "Username must start with lowercase letter and contain only lowercase letters, numbers, underscore, hyphen (3-32 chars)"
+      exit 5
+    fi
+  fi
+  
+  # Validate output format
+  if [[ "${OUTPUT_FORMAT}" != "text" && "${OUTPUT_FORMAT}" != "json" ]]; then
+    log_error "Invalid output format: ${OUTPUT_FORMAT}"
+    log_error "Must be 'text' or 'json'"
+    exit 5
+  fi
+  
+  # Validate log level
+  if [[ ! "${LOG_LEVEL}" =~ ^(DEBUG|INFO|WARNING|ERROR)$ ]]; then
+    log_error "Invalid log level: ${LOG_LEVEL}"
+    log_error "Must be DEBUG, INFO, WARNING, or ERROR"
+    exit 5
+  fi
+  
+  # Check root privileges
+  if [[ $EUID -ne 0 ]]; then
+    log_error "This script must be run as root"
+    log_error "Please run: sudo vps-provision"
+    exit 6
+  fi
+  
+  # Check required commands
+  local required_commands=("apt-get" "systemctl" "python3" "jq" "curl")
+  for cmd in "${required_commands[@]}"; do
+    if ! command -v "$cmd" &> /dev/null; then
+      log_error "Required command not found: $cmd"
+      exit 127
+    fi
+  done
+  
+  log_info "Prerequisites check passed"
+}
+
+# Display banner
+show_banner() {
+  if [[ "${OUTPUT_FORMAT}" == "text" ]]; then
+    cat <<'EOF'
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                                                                           ║
+║              VPS DEVELOPER WORKSTATION PROVISIONING TOOL                 ║
+║                                                                           ║
+║  Automated setup of Debian 13 VPS with desktop, RDP, and development    ║
+║  environment including VSCode, Cursor, and Antigravity IDEs              ║
+║                                                                           ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+EOF
+    echo ""
+    echo "Version: ${VERSION}"
+    echo "Started: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo ""
+  fi
+}
+
+# Main execution function
+main() {
+  # Parse arguments
+  parse_arguments "$@"
+  
+  # Initialize logger with configured level
+  logger_set_level "${LOG_LEVEL}"
+  
+  # Display banner
+  show_banner
+  
+  # Check prerequisites
+  check_prerequisites
+  
+  # Load configuration
+  if [[ -n "${CUSTOM_CONFIG}" ]]; then
+    if [[ ! -f "${CUSTOM_CONFIG}" ]]; then
+      log_error "Configuration file not found: ${CUSTOM_CONFIG}"
+      exit 5
+    fi
+    config_load "${CUSTOM_CONFIG}"
+  else
+    config_load_default
+  fi
+  
+  # Initialize state
+  log_info "Initializing provisioning session..."
+  local session_id
+  session_id=$(state_init_session)
+  log_info "Session ID: ${session_id}"
+  
+  # Update session status
+  state_update_status "IN_PROGRESS"
+  
+  # Pre-flight validation (unless skipped)
+  if [[ "${SKIP_VALIDATION}" == "false" ]]; then
+    log_info "Running pre-flight validation..."
+    if ! validator_check_all; then
+      log_error "Pre-flight validation failed"
+      log_error "System does not meet provisioning requirements"
+      state_update_status "FAILED"
+      exit 1
+    fi
+    log_info "Pre-flight validation passed"
+  else
+    log_warning "Pre-flight validation skipped (not recommended)"
+  fi
+  
+  # Dry run mode
+  if [[ "${DRY_RUN}" == "true" ]]; then
+    log_info "DRY RUN MODE - No changes will be made"
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════"
+    echo "                    PROVISIONING DRY RUN"
+    echo "═══════════════════════════════════════════════════════════════"
+    echo ""
+    
+    # Define all phases with estimated durations (in seconds)
+    local -A phase_durations=(
+      ["system-prep"]=120
+      ["desktop-install"]=300
+      ["rdp-config"]=60
+      ["user-creation"]=30
+      ["ide-vscode"]=180
+      ["ide-cursor"]=120
+      ["ide-antigravity"]=120
+      ["terminal-setup"]=45
+      ["dev-tools"]=90
+      ["verification"]=60
+    )
+    
+    local -a phase_order=(
+      "system-prep"
+      "desktop-install"
+      "rdp-config"
+      "user-creation"
+      "ide-vscode"
+      "ide-cursor"
+      "ide-antigravity"
+      "terminal-setup"
+      "dev-tools"
+      "verification"
+    )
+    
+    local total_duration=0
+    local skipped_count=0
+    local will_run_count=0
+    
+    echo "Planned Phases:"
+    echo "───────────────────────────────────────────────────────────────"
+    printf "%-20s %-12s %-12s %s\n" "PHASE" "DURATION" "STATUS" "NOTES"
+    echo "───────────────────────────────────────────────────────────────"
+    
+    for phase in "${phase_order[@]}"; do
+      local duration="${phase_durations[$phase]}"
+      local checkpoint_exists=false
+      local will_skip=false
+      local status="WILL RUN"
+      local notes=""
+      
+      # Check if phase should be skipped
+      if [[ ${#SKIP_PHASES[@]} -gt 0 ]]; then
+        for skip_phase in "${SKIP_PHASES[@]}"; do
+          if [[ "${phase}" == "${skip_phase}" ]]; then
+            will_skip=true
+            status="SKIPPED"
+            notes="(--skip-phase)"
+            break
+          fi
+        done
+      fi
+      
+      # Check if only specific phases requested
+      if [[ ${#ONLY_PHASES[@]} -gt 0 ]]; then
+        local found=false
+        for only_phase in "${ONLY_PHASES[@]}"; do
+          if [[ "${phase}" == "${only_phase}" ]]; then
+            found=true
+            break
+          fi
+        done
+        if [[ "${found}" == "false" ]]; then
+          will_skip=true
+          status="SKIPPED"
+          notes="(--only-phase)"
+        fi
+      fi
+      
+      # Check for existing checkpoint
+      if checkpoint_exists "${phase}"; then
+        checkpoint_exists=true
+        if [[ "${FORCE_MODE}" == "true" ]]; then
+          status="WILL RUN"
+          notes="(forced, checkpoint exists)"
+        elif [[ "${RESUME_MODE}" == "true" ]]; then
+          will_skip=true
+          status="SKIPPED"
+          notes="(checkpoint exists)"
+        else
+          will_skip=true
+          status="SKIPPED"
+          notes="(checkpoint exists)"
+        fi
+      fi
+      
+      # Format duration
+      local duration_display
+      if [[ ${duration} -lt 60 ]]; then
+        duration_display="${duration}s"
+      else
+        local minutes=$((duration / 60))
+        local seconds=$((duration % 60))
+        duration_display="${minutes}m ${seconds}s"
+      fi
+      
+      printf "%-20s %-12s %-12s %s\n" "${phase}" "${duration_display}" "${status}" "${notes}"
+      
+      if [[ "${will_skip}" == "false" ]]; then
+        total_duration=$((total_duration + duration))
+        will_run_count=$((will_run_count + 1))
+      else
+        skipped_count=$((skipped_count + 1))
+      fi
+    done
+    
+    echo "───────────────────────────────────────────────────────────────"
+    echo ""
+    
+    # Display summary
+    echo "Summary:"
+    echo "  Total phases: ${#phase_order[@]}"
+    echo "  Will execute: ${will_run_count}"
+    echo "  Will skip:    ${skipped_count}"
+    echo ""
+    
+    # Format total duration
+    local hours=$((total_duration / 3600))
+    local minutes=$(((total_duration % 3600) / 60))
+    local seconds=$((total_duration % 60))
+    
+    echo "Estimated Duration:"
+    if [[ ${hours} -gt 0 ]]; then
+      echo "  ${hours}h ${minutes}m ${seconds}s"
+    elif [[ ${minutes} -gt 0 ]]; then
+      echo "  ${minutes}m ${seconds}s"
+    else
+      echo "  ${seconds}s"
+    fi
+    echo ""
+    
+    # Display resource requirements
+    echo "Resource Requirements:"
+    echo "  Disk space: ~5 GB (packages and IDEs)"
+    echo "  Network:    ~2 GB download"
+    echo "  RAM:        2 GB minimum, 4 GB recommended"
+    echo ""
+    
+    # Display what would be created
+    echo "What Would Be Created:"
+    echo "  • Developer user: ${CUSTOM_USERNAME:-devuser}"
+    echo "  • Desktop environment: XFCE 4.18"
+    echo "  • RDP server on port 3389"
+    echo "  • IDEs: VSCode, Cursor, Antigravity"
+    echo "  • Development tools: git, build-essential, etc."
+    echo ""
+    
+    echo "═══════════════════════════════════════════════════════════════"
+    echo "              DRY RUN COMPLETED - NO CHANGES MADE"
+    echo "═══════════════════════════════════════════════════════════════"
+    echo ""
+    echo "To proceed with actual provisioning, run without --dry-run flag"
+    echo ""
+    
+    exit 0
+  fi
+  
+  # Main provisioning logic would go here
+  # For now, just complete the session
+  log_info "Provisioning execution would start here"
+  log_info "This is Phase 2 implementation - core infrastructure only"
+  
+  # Update final status
+  state_update_status "COMPLETED"
+  
+  log_info "Provisioning session completed: ${session_id}"
+  exit 0
+}
+
+# Trap signals for graceful shutdown
+trap 'log_warning "Received SIGINT, initiating graceful shutdown..."; exit 130' SIGINT
+trap 'log_warning "Received SIGTERM, initiating graceful shutdown..."; exit 143' SIGTERM
+trap '' SIGHUP  # Ignore SIGHUP
+
+# Execute main function
+main "$@"

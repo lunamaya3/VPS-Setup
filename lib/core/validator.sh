@@ -1,0 +1,269 @@
+#!/bin/bash
+# validator.sh - Pre-flight validation for VPS provisioning
+# Checks OS version, resources, network connectivity, and package repositories
+
+set -euo pipefail
+
+# Source dependencies
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/core/logger.sh
+source "${SCRIPT_DIR}/logger.sh"
+
+# Validation results
+VALIDATION_ERRORS=0
+VALIDATION_WARNINGS=0
+
+# Initialize validator
+validator_init() {
+  log_debug "Validator initialized"
+  VALIDATION_ERRORS=0
+  VALIDATION_WARNINGS=0
+}
+
+# Check OS version (must be Debian 13)
+# Returns: 0 if valid, 1 if invalid
+validator_check_os() {
+  log_info "Checking OS version..."
+  
+  if [[ ! -f /etc/os-release ]]; then
+    log_error "Cannot determine OS: /etc/os-release not found"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    return 1
+  fi
+  
+  # Temporarily allow unset variables for os-release sourcing
+  set +u
+  # shellcheck source=/dev/null
+  source /etc/os-release
+  set -u
+  
+  if [[ "${ID:-}" != "debian" ]]; then
+    log_error "Unsupported OS: ${ID:-unknown} (expected: debian)"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    return 1
+  fi
+  
+  if [[ "${VERSION_ID:-}" != "13" ]]; then
+    log_error "Unsupported Debian version: ${VERSION_ID:-unknown} (expected: 13)"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    return 1
+  fi
+  
+  log_info "OS check passed: Debian $VERSION_ID ($VERSION_CODENAME)"
+  return 0
+}
+
+# Check RAM availability
+# Args: $1 - minimum RAM in GB (default: 2)
+# Returns: 0 if sufficient, 1 if insufficient
+validator_check_ram() {
+  local min_ram_gb="${1:-2}"
+  log_info "Checking RAM availability (minimum: ${min_ram_gb}GB)..."
+  
+  local total_ram_kb
+  total_ram_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+  local total_ram_gb
+  total_ram_gb=$(awk "BEGIN {printf \"%.2f\", $total_ram_kb / 1024 / 1024}")
+  
+  log_info "Available RAM: ${total_ram_gb}GB"
+  
+  if (( $(echo "$total_ram_gb < $min_ram_gb" | bc -l) )); then
+    log_error "Insufficient RAM: ${total_ram_gb}GB < ${min_ram_gb}GB"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    return 1
+  fi
+  
+  log_info "RAM check passed"
+  return 0
+}
+
+# Check CPU cores
+# Args: $1 - minimum CPU cores (default: 1)
+# Returns: 0 if sufficient, 1 if insufficient
+validator_check_cpu() {
+  local min_cpu="${1:-1}"
+  log_info "Checking CPU cores (minimum: $min_cpu)..."
+  
+  local cpu_count
+  cpu_count=$(nproc)
+  
+  log_info "CPU cores: $cpu_count"
+  
+  if [[ $cpu_count -lt $min_cpu ]]; then
+    log_error "Insufficient CPU cores: $cpu_count < $min_cpu"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    return 1
+  fi
+  
+  log_info "CPU check passed"
+  return 0
+}
+
+# Check disk space
+# Args: $1 - minimum disk space in GB (default: 25)
+# Returns: 0 if sufficient, 1 if insufficient
+validator_check_disk() {
+  local min_disk_gb="${1:-25}"
+  log_info "Checking disk space (minimum: ${min_disk_gb}GB)..."
+  
+  local available_gb
+  available_gb=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
+  
+  log_info "Available disk space: ${available_gb}GB"
+  
+  if [[ $available_gb -lt $min_disk_gb ]]; then
+    log_error "Insufficient disk space: ${available_gb}GB < ${min_disk_gb}GB"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    return 1
+  fi
+  
+  log_info "Disk space check passed"
+  return 0
+}
+
+# Check network connectivity
+# Returns: 0 if connected, 1 if not
+validator_check_network() {
+  log_info "Checking network connectivity..."
+  
+  local test_hosts=("8.8.8.8" "1.1.1.1")
+  local connected=false
+  
+  for host in "${test_hosts[@]}"; do
+    if ping -c 1 -W 2 "$host" &>/dev/null; then
+      log_info "Network check passed: reachable $host"
+      connected=true
+      break
+    fi
+  done
+  
+  if [[ "$connected" == "false" ]]; then
+    log_error "Network connectivity check failed"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    return 1
+  fi
+  
+  return 0
+}
+
+# Check DNS resolution
+# Returns: 0 if working, 1 if not
+validator_check_dns() {
+  log_info "Checking DNS resolution..."
+  
+  if host google.com &>/dev/null; then
+    log_info "DNS check passed"
+    return 0
+  fi
+  
+  log_error "DNS resolution failed"
+  VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+  return 1
+}
+
+# Check package repository accessibility
+# Returns: 0 if accessible, 1 if not
+validator_check_repositories() {
+  log_info "Checking package repositories..."
+  
+  if ! command -v apt-get &>/dev/null; then
+    log_error "apt-get command not found"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    return 1
+  fi
+  
+  log_info "Updating package lists..."
+  if apt-get update &>/dev/null; then
+    log_info "Repository check passed"
+    return 0
+  fi
+  
+  log_error "Failed to update package lists"
+  log_error "Please check repository configuration in /etc/apt/sources.list"
+  VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+  return 1
+}
+
+# Check if running as root
+# Returns: 0 if root, 1 if not
+validator_check_root() {
+  log_info "Checking user privileges..."
+  
+  if [[ $EUID -ne 0 ]]; then
+    log_error "This script must be run as root"
+    VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+    return 1
+  fi
+  
+  log_info "Root privileges confirmed"
+  return 0
+}
+
+# Check for conflicting processes
+# Returns: 0 if no conflicts, 1 if conflicts found
+validator_check_conflicts() {
+  log_info "Checking for conflicting processes..."
+  
+  # Check if another provisioning process is running
+  if [[ -f /var/lock/vps-provision.lock ]]; then
+    local lock_pid
+    lock_pid=$(cat /var/lock/vps-provision.lock 2>/dev/null || echo "")
+    
+    if [[ -n "$lock_pid" ]] && kill -0 "$lock_pid" 2>/dev/null; then
+      log_error "Another provisioning process is running (PID: $lock_pid)"
+      VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+      return 1
+    else
+      log_warning "Stale lock file found, removing"
+      rm -f /var/lock/vps-provision.lock
+    fi
+  fi
+  
+  log_info "No conflicting processes found"
+  return 0
+}
+
+# Run all validation checks
+# Returns: 0 if all passed, 1 if any failed
+validator_run_all() {
+  log_section "Pre-Flight Validation"
+  
+  validator_init
+  
+  # Critical checks (must pass)
+  validator_check_root
+  validator_check_os
+  validator_check_ram 2
+  validator_check_cpu 1
+  validator_check_disk 25
+  validator_check_network
+  validator_check_dns
+  validator_check_repositories
+  validator_check_conflicts
+  
+  log_separator "="
+  
+  if [[ $VALIDATION_ERRORS -gt 0 ]]; then
+    log_error "Validation failed with $VALIDATION_ERRORS error(s)"
+    log_error "Please resolve the issues above before proceeding"
+    return 1
+  fi
+  
+  if [[ $VALIDATION_WARNINGS -gt 0 ]]; then
+    log_warning "Validation passed with $VALIDATION_WARNINGS warning(s)"
+  else
+    log_info "All validation checks passed"
+  fi
+  
+  return 0
+}
+
+# Get validation error count
+validator_get_errors() {
+  echo "$VALIDATION_ERRORS"
+}
+
+# Get validation warning count
+validator_get_warnings() {
+  echo "$VALIDATION_WARNINGS"
+}

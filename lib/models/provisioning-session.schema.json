@@ -1,0 +1,360 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://vps-provision/schemas/provisioning-session.json",
+  "title": "ProvisioningSession",
+  "description": "Schema for a single provisioning execution session",
+  "type": "object",
+  "required": ["session_id", "start_time", "status", "phases", "vps_info"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "pattern": "^[0-9]{8}-[0-9]{6}$",
+      "description": "Unique session identifier (YYYYMMDD-HHMMSS format)",
+      "examples": ["20251223-103000"]
+    },
+    "start_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when provisioning started"
+    },
+    "end_time": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when provisioning completed/failed (null if in progress)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "INITIALIZING",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "FAILED",
+        "ROLLED_BACK"
+      ],
+      "description": "Current execution status"
+    },
+    "phases": {
+      "type": "array",
+      "description": "Execution status of each provisioning phase",
+      "items": {
+        "$ref": "#/definitions/PhaseExecution"
+      }
+    },
+    "error_details": {
+      "type": ["string", "null"],
+      "description": "Error message if status is FAILED (null otherwise)"
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total execution time in seconds"
+    },
+    "vps_info": {
+      "$ref": "#/definitions/VPSInstance",
+      "description": "Information about target VPS"
+    },
+    "developer_user": {
+      "anyOf": [{ "$ref": "#/definitions/DeveloperUser" }, { "type": "null" }],
+      "description": "Developer user account information (null if not yet created)"
+    },
+    "ide_installations": {
+      "type": "array",
+      "description": "Installed IDEs metadata",
+      "items": {
+        "$ref": "#/definitions/IDEInstallation"
+      },
+      "maxItems": 3
+    }
+  },
+  "definitions": {
+    "PhaseExecution": {
+      "type": "object",
+      "required": ["phase_name", "status"],
+      "properties": {
+        "phase_name": {
+          "type": "string",
+          "enum": [
+            "system-prep",
+            "desktop-install",
+            "rdp-config",
+            "user-creation",
+            "ide-vscode",
+            "ide-cursor",
+            "ide-antigravity",
+            "terminal-setup",
+            "dev-tools",
+            "verification"
+          ],
+          "description": "Identifier for phase"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "RUNNING", "COMPLETED", "SKIPPED", "FAILED"],
+          "description": "Phase execution status"
+        },
+        "start_time": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "When phase started (null if not started)"
+        },
+        "end_time": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "When phase completed (null if not finished)"
+        },
+        "duration_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Phase execution time"
+        },
+        "checkpoint_exists": {
+          "type": "boolean",
+          "description": "Whether phase was previously completed"
+        },
+        "actions": {
+          "type": "array",
+          "description": "Individual actions within phase",
+          "items": {
+            "$ref": "#/definitions/ProvisioningAction"
+          }
+        },
+        "error_message": {
+          "type": ["string", "null"],
+          "description": "Error details if failed (null otherwise)"
+        }
+      }
+    },
+    "ProvisioningAction": {
+      "type": "object",
+      "required": ["action_type", "target", "status", "timestamp"],
+      "properties": {
+        "action_type": {
+          "type": "string",
+          "enum": [
+            "PACKAGE_INSTALL",
+            "PACKAGE_REMOVE",
+            "FILE_MODIFY",
+            "FILE_CREATE",
+            "SERVICE_ENABLE",
+            "SERVICE_START",
+            "USER_CREATE",
+            "USER_MODIFY",
+            "COMMAND_EXEC"
+          ],
+          "description": "Type of action performed"
+        },
+        "target": {
+          "type": "string",
+          "description": "Subject of action (package name, file path, service name, username)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "COMPLETED", "FAILED"],
+          "description": "Action result"
+        },
+        "rollback_command": {
+          "type": "string",
+          "description": "Command to reverse this action"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When action was performed"
+        },
+        "output": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Command output (truncated if lengthy)"
+        }
+      }
+    },
+    "VPSInstance": {
+      "type": "object",
+      "required": [
+        "hostname",
+        "ip_address",
+        "os_name",
+        "os_version",
+        "cpu_cores",
+        "ram_mb",
+        "disk_space_gb",
+        "validated"
+      ],
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "description": "System hostname"
+        },
+        "ip_address": {
+          "type": "string",
+          "format": "ipv4",
+          "description": "Primary IP address"
+        },
+        "os_name": {
+          "type": "string",
+          "pattern": ".*Debian.*",
+          "description": "Operating system name (must contain 'Debian')"
+        },
+        "os_version": {
+          "type": "string",
+          "pattern": "^13$",
+          "description": "OS version (must be '13' for Bookworm)"
+        },
+        "kernel_version": {
+          "type": "string",
+          "description": "Kernel version string"
+        },
+        "cpu_cores": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of CPU cores"
+        },
+        "ram_mb": {
+          "type": "integer",
+          "minimum": 2048,
+          "description": "Total RAM in megabytes (minimum 2048)"
+        },
+        "disk_space_gb": {
+          "type": "integer",
+          "minimum": 25,
+          "description": "Total disk space in gigabytes"
+        },
+        "disk_available_gb": {
+          "type": "number",
+          "minimum": 10,
+          "description": "Available disk space before provisioning (minimum 10GB)"
+        },
+        "validated": {
+          "type": "boolean",
+          "description": "Whether system passes pre-flight checks"
+        }
+      }
+    },
+    "DeveloperUser": {
+      "type": "object",
+      "required": [
+        "username",
+        "uid",
+        "gid",
+        "home_directory",
+        "shell",
+        "groups",
+        "created_at"
+      ],
+      "properties": {
+        "username": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{2,31}$",
+          "description": "System username (3-32 chars, lowercase alphanumeric with - and _)"
+        },
+        "full_name": {
+          "type": ["string", "null"],
+          "description": "Full name for display (optional)"
+        },
+        "uid": {
+          "type": "integer",
+          "minimum": 1000,
+          "description": "Unix user ID (minimum 1000 for non-system users)"
+        },
+        "gid": {
+          "type": "integer",
+          "minimum": 1000,
+          "description": "Unix group ID"
+        },
+        "home_directory": {
+          "type": "string",
+          "pattern": "^/home/[a-z][a-z0-9_-]+$",
+          "description": "Home directory path"
+        },
+        "shell": {
+          "type": "string",
+          "pattern": "^/bin/(bash|sh|zsh)$",
+          "description": "Default shell"
+        },
+        "groups": {
+          "type": "array",
+          "description": "Group memberships",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "contains": {
+            "const": "sudo"
+          }
+        },
+        "password_expires": {
+          "type": "boolean",
+          "description": "Whether password must be changed on first login"
+        },
+        "ssh_key_auth_enabled": {
+          "type": "boolean",
+          "description": "Whether SSH key authentication is configured"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When user was created"
+        }
+      }
+    },
+    "IDEInstallation": {
+      "type": "object",
+      "required": [
+        "ide_name",
+        "version",
+        "installation_method",
+        "executable_path",
+        "installed_at",
+        "verified"
+      ],
+      "properties": {
+        "ide_name": {
+          "type": "string",
+          "enum": ["VSCODE", "CURSOR", "ANTIGRAVITY"],
+          "description": "IDE identifier"
+        },
+        "version": {
+          "type": "string",
+          "description": "Installed version string"
+        },
+        "installation_method": {
+          "type": "string",
+          "enum": ["APT_REPOSITORY", "DEB_PACKAGE", "APPIMAGE", "SNAP"],
+          "description": "How IDE was installed"
+        },
+        "installation_path": {
+          "type": "string",
+          "description": "Primary installation directory"
+        },
+        "executable_path": {
+          "type": "string",
+          "description": "Path to main executable"
+        },
+        "desktop_launcher_path": {
+          "type": ["string", "null"],
+          "description": "Path to .desktop file (null if not applicable)"
+        },
+        "command_name": {
+          "type": "string",
+          "description": "CLI command to launch"
+        },
+        "installed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When IDE was installed"
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "Whether post-installation verification passed"
+        },
+        "verification_errors": {
+          "type": "array",
+          "description": "Error messages if verification failed",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
