@@ -128,10 +128,10 @@
 
 ### Verification & Validation
 
-- [ ] T050 [US1] Implement verification module to check all services running (xrdp, lightdm), verify all IDE executables exist and launch, test network port accessibility (22, 3389), validate file permissions, verify configuration correctness per installation-specs.md §Verification
-- [ ] T051 [US1] Generate summary report in JSON format with installed versions, duration per phase, resource usage peaks, success/failure status
-- [ ] T052 [US1] Display "ready" status banner with connection details (IP, port, username, generated password in secure format)
-- [ ] T053 [US1] Create E2E test in `tests/e2e/test_full_provision.sh` to provision fresh VPS, verify all SC-001 through SC-012 success criteria
+- [X] T050 [US1] Implement verification module to check all services running (xrdp, lightdm), verify all IDE executables exist and launch, test network port accessibility (22, 3389), validate file permissions, verify configuration correctness per installation-specs.md §Verification
+- [X] T051 [US1] Generate summary report in JSON format with installed versions, duration per phase, resource usage peaks, success/failure status
+- [X] T052 [US1] Display "ready" status banner with connection details (IP, port, username, generated password in secure format)
+- [X] T053 [US1] Create E2E test in `tests/e2e/test_full_provision.sh` to provision fresh VPS, verify all SC-001 through SC-012 success criteria
 
 **US1 Acceptance**: Can provision fresh VPS with single command, connect via RDP, launch all IDEs successfully
 
