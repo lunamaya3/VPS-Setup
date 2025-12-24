@@ -259,7 +259,11 @@ generate_network_fingerprint() {
   echo ""
   
   echo "--- Firewall Status ---"
-  ufw status | head -5
+  if command -v ufw &>/dev/null; then
+    ufw status 2>/dev/null | head -5 || echo "UFW: Error getting status"
+  else
+    echo "UFW: NOT_INSTALLED"
+  fi
   echo ""
 }
 

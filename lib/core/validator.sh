@@ -267,3 +267,138 @@ validator_get_errors() {
 validator_get_warnings() {
   echo "$VALIDATION_WARNINGS"
 }
+
+# Check network bandwidth (basic test)
+# Returns: 0 if adequate, 1 if too slow
+validator_check_bandwidth() {
+  log_info "Checking network bandwidth..."
+  
+  local test_url="http://speedtest.tele2.net/1MB.zip"
+  local download_time
+  local download_speed
+  
+  # Download 1MB test file and measure time
+  download_time=$(curl -o /dev/null -s -w '%{time_total}' "$test_url" 2>/dev/null || echo "0")
+  
+  if [[ "$download_time" == "0" ]]; then
+    log_warning "Bandwidth test failed (unable to reach test server)"
+    VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
+    return 0  # Non-critical, continue anyway
+  fi
+  
+  # Calculate speed in KB/s (1MB / time)
+  download_speed=$(awk "BEGIN {printf \"%.2f\", 1024 / $download_time}")
+  
+  log_info "Download speed: ${download_speed} KB/s"
+  
+  # Warn if slower than 100 KB/s
+  if (( $(echo "$download_speed < 100" | bc -l) )); then
+    log_warning "Network bandwidth is slow (<100 KB/s), provisioning may take longer"
+    VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
+  fi
+  
+  return 0
+}
+
+# Monitor disk space during provisioning
+# Args: $1 - critical threshold in GB (default: 5)
+# Returns: 0 if OK, 1 if critical
+validator_monitor_disk_space() {
+  local critical_gb="${1:-5}"
+  
+  local available_gb
+  available_gb=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
+  
+  if [[ $available_gb -lt $critical_gb ]]; then
+    log_error "Critical disk space: ${available_gb}GB remaining"
+    log_error "Attempting to free space with apt-get clean..."
+    
+    if apt-get clean &>/dev/null; then
+      # Check again after cleanup
+      available_gb=$(df -BG / | tail -1 | awk '{print $4}' | sed 's/G//')
+      log_info "After cleanup: ${available_gb}GB available"
+      
+      if [[ $available_gb -lt $critical_gb ]]; then
+        log_error "Still insufficient disk space after cleanup"
+        return 1
+      fi
+    else
+      log_error "Failed to run apt-get clean"
+      return 1
+    fi
+  fi
+  
+  return 0
+}
+
+# Get current memory usage percentage
+validator_get_memory_usage() {
+  local total
+  local used
+  local percentage
+  
+  total=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+  used=$(grep -E 'MemTotal|MemAvailable' /proc/meminfo | awk '{total+=$2} END {print total}')
+  
+  percentage=$(awk "BEGIN {printf \"%.1f\", ($used / $total) * 100}")
+  
+  echo "$percentage"
+}
+
+# Check if system resources are under stress
+# Returns: 0 if OK, 1 if stressed
+validator_check_system_load() {
+  log_debug "Checking system load..."
+  
+  local load_avg
+  load_avg=$(uptime | awk -F'load average:' '{print $2}' | awk '{print $1}' | sed 's/,//')
+  
+  local cpu_count
+  cpu_count=$(nproc)
+  
+  # Warn if load average exceeds CPU count
+  if (( $(echo "$load_avg > $cpu_count" | bc -l) )); then
+    log_warning "High system load: $load_avg (CPUs: $cpu_count)"
+    VALIDATION_WARNINGS=$((VALIDATION_WARNINGS + 1))
+    return 1
+  fi
+  
+  log_debug "System load: $load_avg"
+  return 0
+}
+
+# Enhanced pre-flight check with resource validation
+# Args: $1 - min RAM GB, $2 - min disk GB
+# Returns: 0 if passed, 1 if failed
+validator_preflight_resources() {
+  local min_ram="${1:-2}"
+  local min_disk="${2:-25}"
+  
+  log_info "Performing resource pre-flight checks..."
+  
+  local errors=0
+  
+  # Check RAM
+  if ! validator_check_ram "$min_ram"; then
+    errors=$((errors + 1))
+  fi
+  
+  # Check disk
+  if ! validator_check_disk "$min_disk"; then
+    errors=$((errors + 1))
+  fi
+  
+  # Check bandwidth
+  validator_check_bandwidth || true  # Non-critical
+  
+  # Check system load
+  validator_check_system_load || true  # Non-critical
+  
+  if [[ $errors -gt 0 ]]; then
+    log_error "Resource pre-flight check failed with $errors error(s)"
+    return 1
+  fi
+  
+  log_info "Resource pre-flight check passed"
+  return 0
+}
