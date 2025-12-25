@@ -1,10 +1,10 @@
 ---
 agent: 'agent'
-description: 'Create optimized multi-stage Dockerfiles for any language or framework'
 tools: ['search/codebase']
+description: 'Create optimized multi-stage Dockerfiles for any language or framework'
 ---
 
-Your goal is to help create efficient multi-stage Dockerfiles that follow best practices, resulting in smaller, more secure container images.
+Your goal is to help me create efficient multi-stage Dockerfiles that follow best practices, resulting in smaller, more secure container images.
 
 ## Multi-Stage Structure
 

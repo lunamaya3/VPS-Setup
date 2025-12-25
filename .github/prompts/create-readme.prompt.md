@@ -13,7 +13,6 @@ You're a senior expert software engineer with extensive experience in open sourc
 2. Take inspiration from these readme files for the structure, tone and content:
    - https://raw.githubusercontent.com/Azure-Samples/serverless-chat-langchainjs/refs/heads/main/README.md
    - https://raw.githubusercontent.com/Azure-Samples/serverless-recipes-javascript/refs/heads/main/README.md
-   - https://raw.githubusercontent.com/Azure-Samples/react-app/refs/heads/main/README.md
    - https://raw.githubusercontent.com/sinedied/run-on-output/refs/heads/main/README.md
    - https://raw.githubusercontent.com/sinedied/smoke/refs/heads/main/README.md
 3. Do not overuse emojis, and keep the readme concise and to the point.
