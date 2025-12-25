@@ -104,12 +104,11 @@ progress_init() {
 }
 
 # Start a new phase
-# Args: $1 - phase number, $2 - phase name
+# Args: $1 - phase name (phase number is auto-incremented)
 progress_start_phase() {
-  local phase_num="$1"
-  local phase_name="$2"
+  local phase_name="${1:-unknown}"
 
-  CURRENT_PHASE="$phase_num"
+  CURRENT_PHASE=$((CURRENT_PHASE + 1))
   PHASE_NAME="$phase_name"
   PHASE_START_TIME=$(date +%s)
 
@@ -118,7 +117,7 @@ progress_start_phase() {
   phase_key=$(echo "$phase_name" | tr '[:upper:] ' '[:lower:]-')
   PHASE_START_TIMES["$phase_key"]="$PHASE_START_TIME"
 
-  log_info "Phase $phase_num/$TOTAL_PHASES: $phase_name"
+  log_info "Phase $CURRENT_PHASE/$TOTAL_PHASES: $phase_name"
   log_debug "Phase started at: $(date)"
   log_debug "Phase start timestamp: $PHASE_START_TIME"
 
@@ -127,9 +126,8 @@ progress_start_phase() {
 }
 
 # Complete current phase
-# Args: $1 - phase number
+# Args: None (uses current phase)
 progress_complete_phase() {
-  local phase_num="$1"
   local phase_end_time
   local phase_duration
   local phase_key
@@ -158,7 +156,7 @@ progress_complete_phase() {
     fi
   fi
 
-  log_info "Phase $phase_num completed in $(progress_format_duration "$phase_duration")"
+  log_info "Phase $CURRENT_PHASE completed in $(progress_format_duration "$phase_duration")"
   log_debug "Phase end timestamp: $phase_end_time, Duration: ${phase_duration}s"
 
   # UX-005: Persist completion state
