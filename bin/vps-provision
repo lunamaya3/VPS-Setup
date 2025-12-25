@@ -619,16 +619,263 @@ main() {
     exit 0
   fi
   
-  # Main provisioning logic would go here
-  # For now, just complete the session
-  log_info "Provisioning execution would start here"
-  log_info "This is Phase 2 implementation - core infrastructure only"
+  # Main provisioning execution
+  log_info "Starting provisioning execution..."
+  state_update_status "IN_PROGRESS"
+  
+  # Source all required modules
+  source "${LIB_DIR}/modules/system-prep.sh"
+  source "${LIB_DIR}/modules/desktop-env.sh"
+  source "${LIB_DIR}/modules/user-provisioning.sh"
+  source "${LIB_DIR}/modules/rdp-server.sh"
+  source "${LIB_DIR}/modules/ide-vscode.sh"
+  source "${LIB_DIR}/modules/ide-cursor.sh"
+  source "${LIB_DIR}/modules/ide-antigravity.sh"
+  source "${LIB_DIR}/modules/terminal-setup.sh"
+  source "${LIB_DIR}/modules/dev-tools.sh"
+  source "${LIB_DIR}/modules/firewall.sh"
+  source "${LIB_DIR}/modules/fail2ban.sh"
+  source "${LIB_DIR}/modules/verification.sh"
+  source "${LIB_DIR}/modules/summary-report.sh"
+  
+  # Register all phases with progress system
+  progress_register_phase "system-prep" 10
+  progress_register_phase "desktop-env" 25
+  progress_register_phase "user-provisioning" 5
+  progress_register_phase "rdp-server" 8
+  progress_register_phase "ide-vscode" 12
+  progress_register_phase "ide-cursor" 12
+  progress_register_phase "ide-antigravity" 12
+  progress_register_phase "terminal-setup" 4
+  progress_register_phase "dev-tools" 6
+  progress_register_phase "firewall" 2
+  progress_register_phase "fail2ban" 2
+  progress_register_phase "verification" 2
+  
+  # Execute provisioning phases
+  local provisioning_failed=false
+  
+  # Phase 1: System Preparation
+  if ! should_skip_phase "system-prep"; then
+    progress_start_phase "system-prep"
+    log_info "Phase 1: System Preparation"
+    if system_prep_execute; then
+      progress_complete_phase "system-prep"
+      checkpoint_create "system-prep"
+    else
+      log_error "System preparation failed"
+      provisioning_failed=true
+    fi
+  else
+    log_info "Skipping system-prep (checkpoint exists)"
+  fi
+  
+  # Phase 2: Desktop Environment
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "desktop-env"; then
+    progress_start_phase "desktop-env"
+    log_info "Phase 2: Desktop Environment Installation"
+    if desktop_env_execute; then
+      progress_complete_phase "desktop-env"
+      checkpoint_create "desktop-env"
+    else
+      log_error "Desktop environment installation failed"
+      provisioning_failed=true
+    fi
+  else
+    log_info "Skipping desktop-env (checkpoint exists)"
+  fi
+  
+  # Phase 3: User Provisioning
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "user-provisioning"; then
+    progress_start_phase "user-provisioning"
+    log_info "Phase 3: User Provisioning"
+    if user_provisioning_execute "${CUSTOM_USERNAME:-devuser}"; then
+      progress_complete_phase "user-provisioning"
+      checkpoint_create "user-provisioning"
+    else
+      log_error "User provisioning failed"
+      provisioning_failed=true
+    fi
+  else
+    log_info "Skipping user-provisioning (checkpoint exists)"
+  fi
+  
+  # Phase 4: RDP Server
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "rdp-server"; then
+    progress_start_phase "rdp-server"
+    log_info "Phase 4: RDP Server Configuration"
+    if rdp_server_execute; then
+      progress_complete_phase "rdp-server"
+      checkpoint_create "rdp-server"
+    else
+      log_error "RDP server configuration failed"
+      provisioning_failed=true
+    fi
+  else
+    log_info "Skipping rdp-server (checkpoint exists)"
+  fi
+  
+  # Phase 5: IDE Installations (VSCode)
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "ide-vscode"; then
+    progress_start_phase "ide-vscode"
+    log_info "Phase 5: VSCode Installation"
+    if ide_vscode_execute; then
+      progress_complete_phase "ide-vscode"
+      checkpoint_create "ide-vscode"
+    else
+      log_warning "VSCode installation failed (non-critical)"
+    fi
+  else
+    log_info "Skipping ide-vscode (checkpoint exists)"
+  fi
+  
+  # Phase 6: Cursor IDE
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "ide-cursor"; then
+    progress_start_phase "ide-cursor"
+    log_info "Phase 6: Cursor IDE Installation"
+    if ide_cursor_execute; then
+      progress_complete_phase "ide-cursor"
+      checkpoint_create "ide-cursor"
+    else
+      log_warning "Cursor IDE installation failed (non-critical)"
+    fi
+  else
+    log_info "Skipping ide-cursor (checkpoint exists)"
+  fi
+  
+  # Phase 7: Antigravity IDE
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "ide-antigravity"; then
+    progress_start_phase "ide-antigravity"
+    log_info "Phase 7: Antigravity IDE Installation"
+    if ide_antigravity_execute; then
+      progress_complete_phase "ide-antigravity"
+      checkpoint_create "ide-antigravity"
+    else
+      log_warning "Antigravity IDE installation failed (non-critical)"
+    fi
+  else
+    log_info "Skipping ide-antigravity (checkpoint exists)"
+  fi
+  
+  # Phase 8: Terminal Setup
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "terminal-setup"; then
+    progress_start_phase "terminal-setup"
+    log_info "Phase 8: Terminal Setup"
+    if terminal_setup_execute; then
+      progress_complete_phase "terminal-setup"
+      checkpoint_create "terminal-setup"
+    else
+      log_warning "Terminal setup failed (non-critical)"
+    fi
+  else
+    log_info "Skipping terminal-setup (checkpoint exists)"
+  fi
+  
+  # Phase 9: Development Tools
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "dev-tools"; then
+    progress_start_phase "dev-tools"
+    log_info "Phase 9: Development Tools"
+    if dev_tools_execute; then
+      progress_complete_phase "dev-tools"
+      checkpoint_create "dev-tools"
+    else
+      log_warning "Development tools installation failed (non-critical)"
+    fi
+  else
+    log_info "Skipping dev-tools (checkpoint exists)"
+  fi
+  
+  # Phase 10: Firewall Configuration
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "firewall"; then
+    progress_start_phase "firewall"
+    log_info "Phase 10: Firewall Configuration"
+    if firewall_execute; then
+      progress_complete_phase "firewall"
+      checkpoint_create "firewall"
+    else
+      log_warning "Firewall configuration failed (non-critical)"
+    fi
+  else
+    log_info "Skipping firewall (checkpoint exists)"
+  fi
+  
+  # Phase 11: Fail2ban
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "fail2ban"; then
+    progress_start_phase "fail2ban"
+    log_info "Phase 11: Fail2ban Installation"
+    if fail2ban_execute; then
+      progress_complete_phase "fail2ban"
+      checkpoint_create "fail2ban"
+    else
+      log_warning "Fail2ban installation failed (non-critical)"
+    fi
+  else
+    log_info "Skipping fail2ban (checkpoint exists)"
+  fi
+  
+  # Phase 12: Verification
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "verification"; then
+    progress_start_phase "verification"
+    log_info "Phase 12: Post-Install Verification"
+    if verification_execute; then
+      progress_complete_phase "verification"
+      checkpoint_create "verification"
+    else
+      log_warning "Verification found issues (review logs)"
+    fi
+  else
+    log_info "Skipping verification (checkpoint exists)"
+  fi
+  
+  # Handle provisioning result
+  if [[ "${provisioning_failed}" == "true" ]]; then
+    log_error "Provisioning failed - initiating rollback"
+    state_update_status "FAILED"
+    rollback_execute
+    exit 1
+  fi
+  
+  # Generate summary report
+  log_info "Generating summary report..."
+  summary_report_generate
   
   # Update final status
   state_update_status "COMPLETED"
   
-  log_info "Provisioning session completed: ${session_id}"
+  log_info "Provisioning successfully completed: ${session_id}"
   exit 0
+}
+
+# Helper function to check if phase should be skipped
+should_skip_phase() {
+  local phase="$1"
+  
+  # Check if checkpoint exists and not in force mode
+  if checkpoint_exists "${phase}" && [[ "${FORCE_MODE}" != "true" ]]; then
+    return 0  # Should skip
+  fi
+  
+  # Check if phase is in skip list
+  if [[ ${#SKIP_PHASES[@]} -gt 0 ]]; then
+    for skip_phase in "${SKIP_PHASES[@]}"; do
+      if [[ "${phase}" == "${skip_phase}" ]]; then
+        return 0  # Should skip
+      fi
+    done
+  fi
+  
+  # Check if only specific phases requested
+  if [[ ${#ONLY_PHASES[@]} -gt 0 ]]; then
+    for only_phase in "${ONLY_PHASES[@]}"; do
+      if [[ "${phase}" == "${only_phase}" ]]; then
+        return 1  # Should NOT skip
+      fi
+    done
+    return 0  # Should skip (not in only list)
+  fi
+  
+  return 1  # Should NOT skip
+}
 }
 
 # Trap signals for graceful shutdown
