@@ -408,12 +408,12 @@ terminal_setup_validate() {
 #   1 - Setup failed
 terminal_setup_execute() {
   log_info "Starting terminal setup module"
-  progress_start "${TERMINAL_SETUP_PHASE}" "Terminal Enhancement"
+  progress_start_phase "${TERMINAL_SETUP_PHASE}"
 
   # Check if already completed
   if checkpoint_exists "${TERMINAL_SETUP_PHASE}"; then
-    log_info "Terminal setup already completed (checkpoint exists)"
-    progress_complete "${TERMINAL_SETUP_PHASE}"
+    log_info "Terminal setup already completed (checkpoint found)"
+    progress_complete_phase
     return 0
   fi
 

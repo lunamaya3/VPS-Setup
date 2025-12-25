@@ -18,8 +18,9 @@ source "${LIB_DIR}/core/transaction.sh"
 
 # Constants
 readonly CURSOR_CHECKPOINT="${CURSOR_CHECKPOINT:-ide-cursor}"
-# Direct download URL that auto-updates to latest version
-readonly CURSOR_DEB_URL="https://downloader.cursor.sh/linux/appImage/x64"
+# Official download URLs
+readonly CURSOR_DEB_URL="https://download.todesktop.com/230313mzl4w4u92/linux/deb/x64"
+readonly CURSOR_APPIMAGE_API="https://api.github.com/repos/getcursor/cursor/releases/latest"
 readonly CURSOR_INSTALL_DIR="${CURSOR_INSTALL_DIR:-/opt/cursor}"
 readonly CURSOR_DESKTOP="${CURSOR_DESKTOP:-/usr/share/applications/cursor.desktop}"
 readonly CURSOR_TMP_DEB="${CURSOR_TMP_DEB:-/tmp/cursor.deb}"

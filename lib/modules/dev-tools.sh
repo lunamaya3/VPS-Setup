@@ -316,12 +316,12 @@ dev_tools_validate() {
 #   1 - Installation failed
 dev_tools_execute() {
   log_info "Starting development tools module"
-  progress_start "${DEV_TOOLS_PHASE}" "Development Tools Installation"
+  progress_start_phase "${DEV_TOOLS_PHASE}"
 
   # Check if already completed
   if checkpoint_exists "${DEV_TOOLS_PHASE}"; then
-    log_info "Development tools already installed (checkpoint exists)"
-    progress_complete "${DEV_TOOLS_PHASE}"
+    log_info "Development tools already installed (checkpoint found)"
+    progress_complete_phase
     return 0
   fi
 

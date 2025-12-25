@@ -232,6 +232,18 @@ audit_logging_enable() {
   log_info "Enabling auditd service"
   progress_update "Enabling audit logging" 70
 
+  # Check if auditd is installed
+  if ! command -v auditctl &>/dev/null; then
+    log_warning "auditd not installed - skipping audit logging (optional)"
+    return 0
+  fi
+
+  # Check if auditd service exists
+  if ! systemctl list-unit-files auditd.service &>/dev/null; then
+    log_warning "auditd service not found - skipping (optional)"
+    return 0
+  fi
+
   # Load audit rules
   if ! auditctl -R "${AUDIT_RULES_FILE}" 2>&1 | tee -a "${LOG_FILE}"; then
     log_error "Failed to load audit rules"
@@ -264,6 +276,18 @@ audit_logging_enable() {
 audit_logging_verify() {
   log_info "Verifying audit logging configuration"
   progress_update "Verifying audit logging" 90
+
+  # Check if auditd is installed
+  if ! command -v auditctl &>/dev/null; then
+    log_info "auditd not installed - skipping verification (optional)"
+    return 0
+  fi
+
+  # Check if auditd service exists
+  if ! systemctl list-unit-files auditd.service &>/dev/null; then
+    log_info "auditd service not found - skipping verification (optional)"
+    return 0
+  fi
 
   # Check auditd service status
   if ! systemctl is-active --quiet auditd; then

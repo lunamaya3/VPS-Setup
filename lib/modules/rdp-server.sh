@@ -542,7 +542,7 @@ rdp_server_execute() {
   # Check if already completed
   if checkpoint_exists "${RDP_SERVER_PHASE}"; then
     log_info "RDP server already configured (checkpoint exists)"
-    progress_complete "RDP server (cached)"
+    progress_complete_phase
     return 0
   fi
 
