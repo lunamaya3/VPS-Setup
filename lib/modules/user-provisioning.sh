@@ -243,17 +243,17 @@ user_provisioning_configure_audit() {
   # Install auditd if not present
   if ! dpkg -s auditd &>/dev/null; then
     log_info "Installing auditd package"
-    if ! apt-get update &>/dev/null && apt-get install -y auditd 2>&1 | tee -a "${LOG_FILE}"; then
+    if ! apt-get update &>/dev/null || ! apt-get install -y auditd 2>&1 | tee -a "${LOG_FILE}"; then
       log_error "Failed to install auditd"
       return 1
     fi
-    transaction_log "apt-get remove -y auditd"
+    transaction_record "Installed auditd" "apt-get remove -y auditd"
   fi
 
   # Enable auditd service
   if ! systemctl is-enabled auditd &>/dev/null; then
     systemctl enable auditd 2>&1 | tee -a "${LOG_FILE}"
-    transaction_log "systemctl disable auditd"
+    transaction_record "Enabled auditd service" "systemctl disable auditd"
   fi
 
   # Start auditd if not running
@@ -267,7 +267,7 @@ user_provisioning_configure_audit() {
   # Backup existing rules if present
   if [[ -f "${audit_rules_file}" ]]; then
     cp "${audit_rules_file}" "${audit_rules_file}.bak"
-    transaction_log "mv ${audit_rules_file}.bak ${audit_rules_file}"
+    transaction_record "Backed up audit rules" "mv ${audit_rules_file}.bak ${audit_rules_file}"
   fi
 
   # Create audit rules for sudo commands
@@ -285,7 +285,7 @@ user_provisioning_configure_audit() {
 -a always,exit -F arch=b32 -S execve -F euid=0 -F auid>=1000 -F auid!=4294967295 -k privileged_execution
 EOF
 
-  transaction_log "rm -f ${audit_rules_file}"
+  transaction_record "Created audit rules" "rm -f ${audit_rules_file}"
 
   # Load audit rules
   if ! auditctl -R "${audit_rules_file}" 2>&1 | tee -a "${LOG_FILE}"; then
@@ -358,7 +358,7 @@ user_provisioning_generate_password() {
 
   # SEC-003: Set password WITHOUT logging it (use 2>&1 redirection to /dev/null for chpasswd)
   # We only log success/failure, never the actual password
-  if ! echo "${username}:${password}" | chpasswd 2>/dev/null; then
+  if ! echo "${username}:${password}" | chpasswd 2>&1 | grep -v "password" | tee -a "${LOG_FILE}" >/dev/null; then
     log_error "Failed to set password for ${username} (chpasswd failed)"
     return 1
   fi
