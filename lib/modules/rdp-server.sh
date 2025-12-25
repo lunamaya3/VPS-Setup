@@ -41,8 +41,8 @@ readonly XRDP_INI="${XRDP_INI:-${XRDP_CONF_DIR}/xrdp.ini}"
 readonly SESMAN_INI="${SESMAN_INI:-${XRDP_CONF_DIR}/sesman.ini}"
 readonly CERT_FILE="${CERT_FILE:-${XRDP_CONF_DIR}/cert.pem}"
 readonly KEY_FILE="${KEY_FILE:-${XRDP_CONF_DIR}/key.pem}"
-readonly RDP_PORT="${RDP_PORT:-3389}"
-readonly SSH_PORT="${SSH_PORT:-22}"
+: "${RDP_PORT:=3389}"  # Set default if not already set
+: "${SSH_PORT:=22}"  # Set default if not already set
 
 # rdp_server_check_prerequisites
 # Validates system is ready for RDP server installation

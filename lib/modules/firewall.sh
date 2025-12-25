@@ -35,8 +35,8 @@ source "${LIB_DIR}/core/progress.sh"
 
 # Module constants
 readonly FIREWALL_PHASE="${FIREWALL_PHASE:-firewall-config}"
-readonly SSH_PORT="${SSH_PORT:-22}"
-readonly RDP_PORT="${RDP_PORT:-3389}"
+: "${SSH_PORT:=22}"  # Set default if not already set
+: "${RDP_PORT:=3389}"  # Set default if not already set
 
 # firewall_check_prerequisites
 # Validates system is ready for firewall configuration
