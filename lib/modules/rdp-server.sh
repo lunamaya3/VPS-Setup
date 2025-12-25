@@ -508,7 +508,7 @@ rdp_server_validate_installation() {
 #   1 - Setup failed
 rdp_server_execute() {
   log_info "Starting RDP server installation"
-  progress_start "RDP Server Setup"
+  progress_start_phase "rdp-server"
 
   # Check if already completed
   if checkpoint_exists "${RDP_SERVER_PHASE}"; then

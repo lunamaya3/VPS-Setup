@@ -445,8 +445,8 @@ EOF
   # Set executable permissions
   chmod +x "${xsession_file}"
 
-  # Set ownership
-  chown "${username}:${username}" "${xsession_file}"
+  # Set ownership (use devusers group since that's the primary group)
+  chown "${username}:${DEVUSERS_GROUP}" "${xsession_file}"
 
   transaction_log "rm -f ${xsession_file}"
   log_info ".xsession file created successfully"
