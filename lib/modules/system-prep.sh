@@ -466,9 +466,6 @@ system_prep_execute() {
     return 0
   fi
 
-  # Start checkpoint
-  checkpoint_start "${SYSTEM_PREP_PHASE}"
-
   # Configure APT
   if ! system_prep_configure_apt; then
     log_error "Failed to configure APT"

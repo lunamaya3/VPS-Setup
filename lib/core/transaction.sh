@@ -27,17 +27,19 @@ transaction_init() {
   log_dir=$(dirname "$TRANSACTION_LOG")
 
   if [[ ! -d "$log_dir" ]]; then
-    mkdir -p "$log_dir" || {
+    mkdir -p "$log_dir" 2>/dev/null || {
       log_error "Failed to create transaction log directory: $log_dir"
       return 1
     }
+    log_debug "Created transaction log directory: $log_dir"
   fi
 
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
-    touch "$TRANSACTION_LOG" || {
+    touch "$TRANSACTION_LOG" 2>/dev/null || {
       log_error "Failed to create transaction log: $TRANSACTION_LOG"
       return 1
     }
+    log_debug "Created transaction log: $TRANSACTION_LOG"
   fi
 
   chmod 640 "$TRANSACTION_LOG" 2>/dev/null || true
@@ -60,10 +62,18 @@ transaction_record() {
     return 1
   fi
 
+  # Ensure log directory and file exist
+  if [[ ! -f "$TRANSACTION_LOG" ]]; then
+    transaction_init || return 1
+  fi
+
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
   # Format: TIMESTAMP|ACTION|ROLLBACK_COMMAND
-  echo "${timestamp}|${action}|${rollback_cmd}" >>"$TRANSACTION_LOG"
+  echo "${timestamp}|${action}|${rollback_cmd}" >>"$TRANSACTION_LOG" || {
+    log_error "Failed to write to transaction log"
+    return 1
+  }
 
   log_debug "Transaction recorded: $action"
 
