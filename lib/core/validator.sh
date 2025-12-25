@@ -31,25 +31,27 @@ validator_check_os() {
     return 1
   fi
 
-  # Temporarily allow unset variables for os-release sourcing
-  set +u
-  # shellcheck source=/dev/null
-  source /etc/os-release
-  set -u
+  # Parse os-release without sourcing to avoid readonly variable conflicts
+  local os_id os_version_id os_version_codename
+  
+  # Extract values using grep and cut to avoid sourcing
+  os_id=$(grep -oP '^ID=\K.*' /etc/os-release | tr -d '"')
+  os_version_id=$(grep -oP '^VERSION_ID=\K.*' /etc/os-release | tr -d '"')
+  os_version_codename=$(grep -oP '^VERSION_CODENAME=\K.*' /etc/os-release | tr -d '"' || echo "unknown")
 
-  if [[ "${ID:-}" != "debian" ]]; then
-    log_error "Unsupported OS: ${ID:-unknown} (expected: debian)"
+  if [[ "${os_id}" != "debian" ]]; then
+    log_error "Unsupported OS: ${os_id:-unknown} (expected: debian)"
     VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
     return 1
   fi
 
-  if [[ "${VERSION_ID:-}" != "13" ]]; then
-    log_error "Unsupported Debian version: ${VERSION_ID:-unknown} (expected: 13)"
+  if [[ "${os_version_id}" != "13" ]]; then
+    log_error "Unsupported Debian version: ${os_version_id:-unknown} (expected: 13)"
     VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
     return 1
   fi
 
-  log_info "OS check passed: Debian $VERSION_ID ($VERSION_CODENAME)"
+  log_info "OS check passed: Debian ${os_version_id} (${os_version_codename})"
   return 0
 }
 
