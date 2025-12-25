@@ -24,17 +24,17 @@ readonly BANNER_NC='\033[0m'
 display_ready_banner() {
   local dev_username="${1:-devuser}"
   local dev_password="${2:-[Generated - see logs]}"
-  
+
   # Get system information
   local hostname ip_address rdp_port
   hostname=$(hostname)
   ip_address=$(hostname -I | awk '{print $1}' || echo "unknown")
   rdp_port="3389"
-  
+
   # Calculate total duration
   local duration
-  duration="15 minutes"  # Placeholder - should be calculated from session
-  
+  duration="15 minutes" # Placeholder - should be calculated from session
+
   echo ""
   echo -e "${BANNER_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${BANNER_NC}"
   echo -e "${BANNER_GREEN}  ✓ VPS Developer Workstation Ready!${BANNER_NC}"
@@ -74,7 +74,7 @@ display_ready_banner() {
   echo -e "${BANNER_GREEN}  Provisioning completed successfully!${BANNER_NC}"
   echo -e "${BANNER_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${BANNER_NC}"
   echo ""
-  
+
   return 0
 }
 
@@ -90,7 +90,7 @@ status_banner_show_rdp_info() {
   local ip_address
   ip_address=$(hostname -I | awk '{print $1}' || echo "unknown")
   local rdp_port="3389"
-  
+
   echo "RDP: ${ip_address}:${rdp_port}"
 }
 

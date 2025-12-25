@@ -83,7 +83,8 @@ teardown() {
   transaction_record "Failed operation" "exit 1"
   transaction_record "Created file2" "rm -f ${TEST_DIR}/file2"
   
-  rollback_execute
+  # Rollback will fail due to middle command, but should continue
+  run rollback_execute
   
   # file1 and file2 should still be removed despite middle failure
   [[ ! -f "${TEST_DIR}/file1" ]]
@@ -117,6 +118,19 @@ teardown() {
   touch "${TEST_DIR}/should_be_removed"
   transaction_record "Created file" "rm -f ${TEST_DIR}/should_be_removed"
   
+  # Mock systemctl to avoid interfering with real services
+  systemctl() {
+    # Always return inactive for test services
+    return 1
+  }
+  export -f systemctl
+  
+  # Mock id command to return no user
+  id() {
+    return 1
+  }
+  export -f id
+  
   rollback_execute
   
   rollback_verify
@@ -129,6 +143,18 @@ teardown() {
   
   touch "${TEST_DIR}/persistent_file"
   transaction_record "Created file" "echo 'not actually removing'"
+  
+  # Mock systemctl to avoid interfering with real services
+  systemctl() {
+    return 1  # Return inactive
+  }
+  export -f systemctl
+  
+  # Mock id command
+  id() {
+    return 1  # User doesn't exist
+  }
+  export -f id
   
   rollback_execute
   
@@ -172,7 +198,14 @@ teardown() {
 @test "rollback handles service operations" {
   transaction_init
   
-  # Record service operation
+  # Mock systemctl to prevent actual service interaction
+  systemctl() {
+    echo "Mocked systemctl $*"
+    return 0
+  }
+  export -f systemctl
+  
+  # Record service operation with safe echo command
   transaction_record "Started service" "echo 'stop service'"
   
   rollback_execute
@@ -223,9 +256,12 @@ teardown() {
   transaction_record "Will fail" "exit 1"
   transaction_record "Will also fail" "exit 1"
   
-  rollback_execute
+  # Execute rollback (will fail due to errors, but we want to check error count)
+  rollback_execute 2>/dev/null || true
   
-  [[ $ROLLBACK_ERRORS -eq 2 ]]
+  # Check error count via rollback_get_stats (returns JSON)
+  stats=$(rollback_get_stats)
+  [[ "$stats" =~ "\"errors\":2" ]]
 }
 
 @test "rollback handles empty rollback commands" {
@@ -279,7 +315,7 @@ teardown() {
   transaction_record "Action 1" "rollback1"
   transaction_record "Action 2" "rollback2"
   
-  rollback_execute
+  run rollback_execute
   
   stats=$(rollback_get_stats)
   

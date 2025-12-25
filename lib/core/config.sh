@@ -4,11 +4,15 @@
 
 set -euo pipefail
 
-# Prevent multiple sourcing
-if [[ -n "${_CONFIG_SH_LOADED:-}" ]]; then
+# Prevent multiple sourcing (but allow in test environment for test isolation)
+if [[ -n "${_CONFIG_SH_LOADED:-}" ]] && [[ -z "${BATS_TEST_TMPDIR:-}" ]]; then
   return 0
 fi
-readonly _CONFIG_SH_LOADED=1
+if [[ -z "${BATS_TEST_TMPDIR:-}" ]]; then
+  readonly _CONFIG_SH_LOADED=1
+else
+  _CONFIG_SH_LOADED=1
+fi
 
 # Source logger for output
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,42 +21,54 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/logger.sh"
 
 # Configuration file paths (only set if not already set)
+# Don't make readonly in test environments to allow test isolation
 if [[ -z "${SYSTEM_CONFIG:-}" ]]; then
-  readonly SYSTEM_CONFIG="/etc/vps-provision/default.conf"
+  if [[ -z "${BATS_TEST_TMPDIR:-}" ]]; then
+    readonly SYSTEM_CONFIG="/etc/vps-provision/default.conf"
+  else
+    SYSTEM_CONFIG="/etc/vps-provision/default.conf"
+  fi
 fi
 if [[ -z "${USER_CONFIG:-}" ]]; then
-  readonly USER_CONFIG="${HOME}/.vps-provision.conf"
+  if [[ -z "${BATS_TEST_TMPDIR:-}" ]]; then
+    readonly USER_CONFIG="${HOME}/.vps-provision.conf"
+  else
+    USER_CONFIG="${HOME}/.vps-provision.conf"
+  fi
 fi
 if [[ -z "${PROJECT_CONFIG:-}" ]]; then
   PROJECT_CONFIG="$(dirname "$SCRIPT_DIR")/../config/default.conf"
-  readonly PROJECT_CONFIG
+  if [[ -z "${BATS_TEST_TMPDIR:-}" ]]; then
+    readonly PROJECT_CONFIG
+  fi
 fi
 
 # Configuration variables (will be populated from config files)
-declare -A CONFIG
+# Use -g to ensure global scope for test compatibility
+declare -gA CONFIG
 
 # Initialize configuration system
 # Loads configuration from files in priority order
 config_init() {
   log_debug "Initializing configuration system"
-  
+
   # Load in priority order (later files override earlier ones)
   local config_files=("$PROJECT_CONFIG" "$SYSTEM_CONFIG" "$USER_CONFIG")
   local file
   local loaded=0
-  
+
   for file in "${config_files[@]}"; do
     if [[ -f "$file" ]]; then
       config_load_file "$file"
       loaded=$((loaded + 1))
     fi
   done
-  
+
   if [[ $loaded -eq 0 ]]; then
     log_warning "No configuration files found"
     return 1
   fi
-  
+
   log_debug "Configuration loaded from $loaded file(s)"
   log_debug "Configuration loaded from $loaded file(s)"
   return 0
@@ -72,46 +88,46 @@ config_load() {
 # Args: $1 - config file path
 config_load_file() {
   local config_file="$1"
-  
+
   if [[ ! -f "$config_file" ]]; then
     log_debug "Config file not found: $config_file"
     return 1
   fi
-  
+
   if [[ ! -r "$config_file" ]]; then
     log_error "Config file not readable: $config_file"
     return 1
   fi
-  
+
   log_debug "Loading config from: $config_file"
-  
+
   # Temporarily disable unbound variable check for CONFIG array assignments
   set +u
-  
+
   # Read config file line by line
   while IFS='=' read -r key value; do
     # Skip comments and empty lines
     [[ "$key" =~ ^[[:space:]]*# ]] && continue
     [[ -z "$key" ]] && continue
-    
+
     # Trim whitespace
     key=$(echo "$key" | xargs)
     value=$(echo "$value" | xargs)
-    
+
     # Remove quotes from value if present
     value="${value%\"}"
     value="${value#\"}"
-    
+
     # Store in CONFIG associative array (only if key is not empty)
     if [[ -n "$key" ]]; then
       CONFIG["$key"]="$value"
     fi
-    
-  done < "$config_file"
-  
+
+  done <"$config_file"
+
   # Re-enable unbound variable check
   set -u
-  
+
   log_debug "Loaded configuration from: $config_file"
   return 0
 }
@@ -122,10 +138,15 @@ config_load_file() {
 config_get() {
   local key="$1"
   local default="${2:-}"
-  
+
+  # Temporarily disable unbound variable check
+  set +u
   if [[ -n "${CONFIG[$key]:-}" ]]; then
-    echo "${CONFIG[$key]}"
+    local value="${CONFIG[$key]}"
+    set -u
+    echo "$value"
   else
+    set -u
     echo "$default"
   fi
 }
@@ -135,16 +156,16 @@ config_get() {
 config_set() {
   local key="$1"
   local value="$2"
-  
+
   if [[ -z "$key" ]]; then
     log_error "Config key cannot be empty"
     return 1
   fi
-  
+
   set +u
   CONFIG["$key"]="$value"
   set -u
-  
+
   log_debug "Config set: $key=$value"
 }
 
@@ -153,11 +174,16 @@ config_set() {
 # Returns: 0 if exists, 1 if not
 config_has() {
   local key="$1"
-  
-  if [[ -n "${CONFIG[$key]:-}" ]]; then
+
+  # Temporarily disable unbound variable check
+  set +u
+  # Check if key exists in array, not if its value is non-empty
+  if [[ -v "CONFIG[$key]" ]]; then
+    set -u
     return 0
   fi
-  
+  set -u
+
   return 1
 }
 
@@ -165,9 +191,9 @@ config_has() {
 # Returns: 0 if valid, 1 if invalid
 config_validate() {
   log_debug "Validating configuration"
-  
+
   local errors=0
-  
+
   # Validate username format
   local username
   username=$(config_get "DEVELOPER_USERNAME" "devuser")
@@ -175,7 +201,7 @@ config_validate() {
     log_error "Invalid username format: $username"
     errors=$((errors + 1))
   fi
-  
+
   # Validate ports
   local ports=("RDP_PORT" "SSH_PORT")
   local port_key
@@ -187,7 +213,7 @@ config_validate() {
       errors=$((errors + 1))
     fi
   done
-  
+
   # Validate log level
   local log_level
   log_level=$(config_get "LOG_LEVEL" "INFO")
@@ -195,7 +221,7 @@ config_validate() {
     log_error "Invalid log level: $log_level"
     errors=$((errors + 1))
   fi
-  
+
   # Validate boolean values
   local bool_keys=("ENABLE_FIREWALL" "ENABLE_COLORS" "FORCE_MODE" "DRY_RUN")
   local bool_key
@@ -207,7 +233,7 @@ config_validate() {
       errors=$((errors + 1))
     fi
   done
-  
+
   # Validate numeric values
   local min_ram
   min_ram=$(config_get "MIN_RAM_GB" "2")
@@ -215,12 +241,12 @@ config_validate() {
     log_error "Invalid minimum RAM: $min_ram"
     errors=$((errors + 1))
   fi
-  
+
   if [[ $errors -gt 0 ]]; then
     log_error "Configuration validation failed with $errors error(s)"
     return 1
   fi
-  
+
   log_debug "Configuration validation passed"
   return 0
 }
@@ -228,7 +254,7 @@ config_validate() {
 # Display current configuration
 config_show() {
   log_info "Current Configuration:"
-  
+
   local key
   for key in "${!CONFIG[@]}"; do
     # Don't show sensitive values in logs
@@ -269,11 +295,11 @@ config_load_from_args() {
         config_set "RESUME_MODE" "true"
         shift
         ;;
-      -y|--yes)
+      -y | --yes)
         config_set "AUTO_YES" "true"
         shift
         ;;
-      -v|--verbose)
+      -v | --verbose)
         config_set "VERBOSE" "true"
         config_set "LOG_LEVEL" "DEBUG"
         shift
@@ -293,11 +319,11 @@ config_get_bool() {
   local key="$1"
   local default="${2:-false}"
   local value
-  
+
   value=$(config_get "$key" "$default")
-  
+
   case "${value,,}" in
-    true|yes|1|on)
+    true | yes | 1 | on)
       echo "true"
       ;;
     *)
@@ -313,9 +339,9 @@ config_get_int() {
   local key="$1"
   local default="${2:-0}"
   local value
-  
+
   value=$(config_get "$key" "$default")
-  
+
   if [[ "$value" =~ ^[0-9]+$ ]]; then
     echo "$value"
   else
@@ -329,7 +355,7 @@ config_export_env() {
   for key in "${!CONFIG[@]}"; do
     export "$key=${CONFIG[$key]}"
   done
-  
+
   log_debug "Configuration exported to environment"
 }
 
@@ -343,18 +369,18 @@ config_has_key() {
 config_validate_required() {
   local errors=0
   local key
-  
+
   for key in "$@"; do
     if ! config_has_key "$key"; then
       log_error "Required configuration key missing: $key"
       errors=$((errors + 1))
     fi
   done
-  
+
   if [[ $errors -gt 0 ]]; then
     return 1
   fi
-  
+
   return 0
 }
 
@@ -363,14 +389,14 @@ config_validate_required() {
 config_validate_boolean() {
   local key="$1"
   local value
-  
+
   value=$(config_get "$key")
-  
+
   if [[ ! "$value" =~ ^(true|false|yes|no|1|0|on|off)$ ]]; then
     log_error "Invalid boolean value for $key: $value"
     return 1
   fi
-  
+
   return 0
 }
 
@@ -379,14 +405,14 @@ config_validate_boolean() {
 config_validate_integer() {
   local key="$1"
   local value
-  
+
   value=$(config_get "$key")
-  
+
   if [[ ! "$value" =~ ^[0-9]+$ ]]; then
     log_error "Invalid integer value for $key: $value"
     return 1
   fi
-  
+
   return 0
 }
 
@@ -397,19 +423,19 @@ config_validate_range() {
   local min="$2"
   local max="$3"
   local value
-  
+
   value=$(config_get "$key")
-  
+
   if [[ ! "$value" =~ ^[0-9]+$ ]]; then
     log_error "Value for $key is not a number: $value"
     return 1
   fi
-  
+
   if [[ $value -lt $min ]] || [[ $value -gt $max ]]; then
     log_error "Value for $key out of range [$min-$max]: $value"
     return 1
   fi
-  
+
   return 0
 }
 
@@ -424,7 +450,7 @@ config_export() {
 # Export configuration as JSON
 config_export_json() {
   local first=true
-  
+
   echo "{"
   for key in "${!CONFIG[@]}"; do
     if [[ "$first" == "true" ]]; then
@@ -432,11 +458,11 @@ config_export_json() {
     else
       echo ","
     fi
-    
+
     # Escape quotes in value
     local value="${CONFIG[$key]}"
     value="${value//\"/\\\"}"
-    
+
     echo -n "  \"$key\": \"$value\""
   done
   echo ""
@@ -447,12 +473,12 @@ config_export_json() {
 # Args: $1 - output file path
 config_save() {
   local output_file="$1"
-  
-  config_export > "$output_file" || {
+
+  config_export >"$output_file" || {
     log_error "Failed to save configuration to: $output_file"
     return 1
   }
-  
+
   log_info "Configuration saved to: $output_file"
   return 0
 }
@@ -462,7 +488,7 @@ config_reload() {
   # Clear existing configuration
   unset CONFIG
   declare -gA CONFIG
-  
+
   # Reload from files
   config_init
 }

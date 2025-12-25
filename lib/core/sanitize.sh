@@ -44,13 +44,13 @@ readonly DANGEROUS_CHARS='[;&|`$(){}<>"'\''\\]'
 #######################################
 sanitize_string() {
   local input="$1"
-  
+
   # Check for dangerous characters
   if [[ "$input" =~ $DANGEROUS_CHARS ]]; then
     log_error "Input contains dangerous characters (SEC-018)"
     return 1
   fi
-  
+
   echo "$input"
   return 0
 }
@@ -69,31 +69,31 @@ sanitize_string() {
 #######################################
 sanitize_path() {
   local path="$1"
-  
+
   # Reject empty paths
   if [[ -z "$path" ]]; then
     log_error "Path is empty (SEC-018)"
     return 1
   fi
-  
+
   # Reject paths with directory traversal attempts
   if [[ "$path" == *".."* ]]; then
     log_error "Path contains directory traversal (SEC-018): $path"
     return 1
   fi
-  
+
   # Reject paths with null bytes
   if [[ "$path" == *$'\0'* ]]; then
     log_error "Path contains null bytes (SEC-018)"
     return 1
   fi
-  
+
   # Check for dangerous shell characters
   if [[ "$path" =~ [';|&`$<>'] ]]; then
     log_error "Path contains dangerous shell characters (SEC-018): $path"
     return 1
   fi
-  
+
   echo "$path"
   return 0
 }
@@ -112,21 +112,21 @@ sanitize_path() {
 #######################################
 sanitize_username() {
   local username="$1"
-  
+
   # Linux username requirements:
   # - Start with lowercase letter
   # - Only lowercase letters, numbers, underscore, hyphen
   # - Length: 1-32 characters
   # - Recommended: 3-31 characters
-  
+
   local username_regex='^[a-z][a-z0-9_-]{2,31}$'
-  
+
   if [[ ! "$username" =~ $username_regex ]]; then
     log_error "Username is invalid (SEC-018): $username"
     log_error "Username must start with lowercase letter, contain only [a-z0-9_-], and be 3-32 chars"
     return 1
   fi
-  
+
   # Additional check: reject reserved usernames
   local -a reserved_names=(
     "root" "daemon" "bin" "sys" "sync" "games" "man" "lp" "mail" "news"
@@ -134,14 +134,14 @@ sanitize_username() {
     "systemd-network" "systemd-resolve" "messagebus" "syslog" "_apt"
     "mysql" "postgres" "redis" "mongodb"
   )
-  
+
   for reserved in "${reserved_names[@]}"; do
     if [[ "$username" == "$reserved" ]]; then
       log_error "Username is reserved (SEC-018): $username"
       return 1
     fi
   done
-  
+
   echo "$username"
   return 0
 }
@@ -161,17 +161,17 @@ sanitize_username() {
 sanitize_log_level() {
   local level="$1"
   local -a valid_levels=("DEBUG" "INFO" "WARNING" "ERROR")
-  
+
   # Convert to uppercase for comparison
   level="${level^^}"
-  
+
   for valid in "${valid_levels[@]}"; do
     if [[ "$level" == "$valid" ]]; then
       echo "$level"
       return 0
     fi
   done
-  
+
   log_error "Invalid log level (SEC-018): $level"
   log_error "Valid levels: ${valid_levels[*]}"
   return 1
@@ -192,17 +192,17 @@ sanitize_log_level() {
 sanitize_output_format() {
   local format="$1"
   local -a valid_formats=("text" "json")
-  
+
   # Convert to lowercase for comparison
   format="${format,,}"
-  
+
   for valid in "${valid_formats[@]}"; do
     if [[ "$format" == "$valid" ]]; then
       echo "$format"
       return 0
     fi
   done
-  
+
   log_error "Invalid output format (SEC-018): $format"
   log_error "Valid formats: ${valid_formats[*]}"
   return 1
@@ -234,14 +234,14 @@ sanitize_phase_name() {
     "dev-tools"
     "verification"
   )
-  
+
   for valid in "${valid_phases[@]}"; do
     if [[ "$phase" == "$valid" ]]; then
       echo "$phase"
       return 0
     fi
   done
-  
+
   log_error "Invalid phase name (SEC-018): $phase"
   log_error "Valid phases: ${valid_phases[*]}"
   return 1
@@ -289,7 +289,7 @@ sanitize_input() {
 #######################################
 escape_for_shell() {
   local input="$1"
-  
+
   # Single-quote the string and escape any single quotes within it
   # This is the safest way to pass arbitrary strings to shell commands
   printf '%s' "'${input//\'/\'\\\'\'}'"
@@ -313,25 +313,25 @@ sanitize_integer() {
   local value="$1"
   local min="${2:-}"
   local max="${3:-}"
-  
+
   # Check if it's a valid integer
   if ! [[ "$value" =~ ^-?[0-9]+$ ]]; then
     log_error "Not a valid integer (SEC-018): $value"
     return 1
   fi
-  
+
   # Check minimum
-  if [[ -n "$min" ]] && (( value < min )); then
+  if [[ -n "$min" ]] && ((value < min)); then
     log_error "Value $value is below minimum $min (SEC-018)"
     return 1
   fi
-  
+
   # Check maximum
-  if [[ -n "$max" ]] && (( value > max )); then
+  if [[ -n "$max" ]] && ((value > max)); then
     log_error "Value $value is above maximum $max (SEC-018)"
     return 1
   fi
-  
+
   echo "$value"
   return 0
 }

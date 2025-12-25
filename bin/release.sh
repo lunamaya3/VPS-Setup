@@ -42,25 +42,25 @@ log_error() {
 # Check prerequisites
 check_prerequisites() {
   log_info "Checking prerequisites..."
-  
+
   local missing=()
-  
+
   command -v tar >/dev/null || missing+=("tar")
   command -v gzip >/dev/null || missing+=("gzip")
   command -v shellcheck >/dev/null || log_warning "shellcheck not found (optional)"
-  
+
   if [[ ${#missing[@]} -gt 0 ]]; then
     log_error "Missing required tools: ${missing[*]}"
     exit 1
   fi
-  
+
   log_success "Prerequisites OK"
 }
 
 # Run tests
 run_tests() {
   log_info "Running test suite..."
-  
+
   if [[ -f "${PROJECT_ROOT}/Makefile" ]]; then
     if make -C "$PROJECT_ROOT" test 2>&1 | tail -5; then
       log_success "Tests passed"
@@ -76,9 +76,9 @@ run_tests() {
 # Lint code
 lint_code() {
   log_info "Running code linters..."
-  
+
   local lint_errors=0
-  
+
   # Shellcheck on bash scripts
   if command -v shellcheck >/dev/null; then
     log_info "Running shellcheck..."
@@ -88,7 +88,7 @@ lint_code() {
       log_warning "Shellcheck found issues (non-blocking)"
     fi
   fi
-  
+
   # Python syntax check
   if command -v python3 >/dev/null; then
     log_info "Checking Python syntax..."
@@ -99,7 +99,7 @@ lint_code() {
       ((lint_errors++))
     fi
   fi
-  
+
   if [[ $lint_errors -gt 0 ]]; then
     log_error "Linting failed with $lint_errors errors"
     return 1
@@ -109,88 +109,88 @@ lint_code() {
 # Create build directory
 create_build_dir() {
   log_info "Creating build directory..."
-  
+
   rm -rf "$BUILD_DIR"
   mkdir -p "$DIST_DIR"
-  
+
   log_success "Build directory created: $DIST_DIR"
 }
 
 # Copy files to distribution
 copy_files() {
   log_info "Copying files to distribution..."
-  
+
   # Core executables
   cp -r "${PROJECT_ROOT}/bin" "$DIST_DIR/"
   chmod +x "${DIST_DIR}"/bin/*
-  
+
   # Libraries
   cp -r "${PROJECT_ROOT}/lib" "$DIST_DIR/"
-  
+
   # Configuration
   cp -r "${PROJECT_ROOT}/config" "$DIST_DIR/"
-  
+
   # Documentation
   cp -r "${PROJECT_ROOT}/docs" "$DIST_DIR/"
   cp "${PROJECT_ROOT}/README.md" "$DIST_DIR/"
   cp "${PROJECT_ROOT}/CHANGELOG.md" "$DIST_DIR/"
   cp "${PROJECT_ROOT}/CONTRIBUTING.md" "$DIST_DIR/"
-  
+
   # License (if exists)
   [[ -f "${PROJECT_ROOT}/LICENSE" ]] && cp "${PROJECT_ROOT}/LICENSE" "$DIST_DIR/"
-  
+
   # Makefile
   [[ -f "${PROJECT_ROOT}/Makefile" ]] && cp "${PROJECT_ROOT}/Makefile" "$DIST_DIR/"
-  
+
   # Requirements
   [[ -f "${PROJECT_ROOT}/requirements.txt" ]] && cp "${PROJECT_ROOT}/requirements.txt" "$DIST_DIR/"
-  
+
   # Bash completion
   [[ -d "${PROJECT_ROOT}/etc" ]] && cp -r "${PROJECT_ROOT}/etc" "$DIST_DIR/"
-  
+
   log_success "Files copied"
 }
 
 # Remove development files
 clean_dev_files() {
   log_info "Removing development files..."
-  
+
   # Remove test files
   rm -rf "${DIST_DIR}/tests"
-  
+
   # Remove spec files
   rm -rf "${DIST_DIR}/specs"
-  
+
   # Remove Git files
   rm -rf "${DIST_DIR}/.git"
   rm -f "${DIST_DIR}/.gitignore"
   rm -f "${DIST_DIR}/.gitattributes"
-  
+
   # Remove editor files
   rm -rf "${DIST_DIR}/.vscode"
   rm -rf "${DIST_DIR}/.idea"
   rm -f "${DIST_DIR}/.editorconfig"
-  
+
   # Remove CI/CD files
   rm -rf "${DIST_DIR}/.github"
-  
+
   # Remove Python cache
   find "$DIST_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
   find "$DIST_DIR" -type f -name "*.pyc" -delete 2>/dev/null || true
-  
+
   # Remove temporary files
   find "$DIST_DIR" -type f -name "*.swp" -delete 2>/dev/null || true
   find "$DIST_DIR" -type f -name "*.bak" -delete 2>/dev/null || true
   find "$DIST_DIR" -type f -name "*~" -delete 2>/dev/null || true
-  
+
   log_success "Development files removed"
 }
 
 # Create installation script
 create_install_script() {
   log_info "Creating installation script..."
-  
-  cat > "${DIST_DIR}/install.sh" <<'EOF'
+
+  cat >"${DIST_DIR}/install.sh" <<'EOF'
 #!/bin/bash
 # VPS Provisioning Tool Installer
 # Installs the tool to /opt/vps-provision
@@ -249,8 +249,8 @@ EOF
 # Create VERSION file
 create_version_file() {
   log_info "Creating VERSION file..."
-  
-  cat > "${DIST_DIR}/VERSION" <<EOF
+
+  cat >"${DIST_DIR}/VERSION" <<EOF
 VPS Developer Workstation Provisioning Tool
 Version: ${VERSION}
 Release Date: $(date +%Y-%m-%d)
@@ -280,27 +280,27 @@ EOF
 # Generate checksums
 generate_checksums() {
   log_info "Generating checksums..."
-  
+
   cd "$DIST_DIR"
-  
+
   # SHA256 checksums
-  find . -type f ! -name "SHA256SUMS" -exec sha256sum {} \; > SHA256SUMS
-  
+  find . -type f ! -name "SHA256SUMS" -exec sha256sum {} \; >SHA256SUMS
+
   cd "$PROJECT_ROOT"
-  
+
   log_success "Checksums generated"
 }
 
 # Create tarball
 create_tarball() {
   log_info "Creating tarball..."
-  
+
   cd "$BUILD_DIR"
-  
+
   tar -czf "$TARBALL" "$RELEASE_NAME"
-  
+
   cd "$PROJECT_ROOT"
-  
+
   local size
   size="$(du -h "$TARBALL" | cut -f1)" || size="unknown"
   log_success "Tarball created: $TARBALL ($size)"
@@ -309,10 +309,10 @@ create_tarball() {
 # Generate release notes
 generate_release_notes() {
   log_info "Generating release notes..."
-  
+
   local notes_file="${BUILD_DIR}/RELEASE_NOTES.txt"
-  
-  cat > "$notes_file" <<EOF
+
+  cat >"$notes_file" <<EOF
 VPS Developer Workstation Provisioning Tool v${VERSION}
 Release Date: $(date +%Y-%m-%d)
 
@@ -416,9 +416,9 @@ EOF
 # Verify distribution
 verify_distribution() {
   log_info "Verifying distribution..."
-  
+
   local errors=0
-  
+
   # Check required files
   local required_files=(
     "bin/vps-provision"
@@ -431,30 +431,30 @@ verify_distribution() {
     "VERSION"
     "SHA256SUMS"
   )
-  
+
   for file in "${required_files[@]}"; do
     if [[ ! -f "${DIST_DIR}/${file}" ]]; then
       log_error "Missing required file: $file"
       ((errors++))
     fi
   done
-  
+
   # Check executables
   if [[ ! -x "${DIST_DIR}/bin/vps-provision" ]]; then
     log_error "vps-provision is not executable"
     ((errors++))
   fi
-  
+
   # Check no test files
   if find "$DIST_DIR" -name "*.bats" -o -name "test_*.sh" | grep -q .; then
     log_warning "Test files found in distribution"
   fi
-  
+
   if [[ $errors -gt 0 ]]; then
     log_error "Distribution verification failed with $errors errors"
     return 1
   fi
-  
+
   log_success "Distribution verified"
 }
 
@@ -500,9 +500,9 @@ main() {
   echo " Version: ${VERSION}"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
-  
+
   check_prerequisites
-  
+
   # Optional: run tests (can be skipped with --skip-tests)
   if [[ "${1:-}" != "--skip-tests" ]]; then
     run_tests || {
@@ -511,13 +511,13 @@ main() {
       [[ "$response" =~ ^[Yy]$ ]] || exit 1
     }
   fi
-  
+
   lint_code || {
     log_warning "Linting issues found. Continue anyway? (y/N)"
     read -r response
     [[ "$response" =~ ^[Yy]$ ]] || exit 1
   }
-  
+
   create_build_dir
   copy_files
   clean_dev_files
@@ -527,7 +527,7 @@ main() {
   verify_distribution
   create_tarball
   generate_release_notes
-  
+
   print_summary
 }
 

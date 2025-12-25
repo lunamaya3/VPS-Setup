@@ -13,14 +13,14 @@ Usage:
     python3 package-manager.py fix-broken
 """
 
+import json
+import os
+import re
 import subprocess
 import sys
-import json
-import re
-import os
+from typing import Any, Dict, List, Optional, Tuple
+
 import psutil
-import time
-from typing import List, Dict, Optional, Tuple, Any
 
 
 class PackageManager:
@@ -50,18 +50,24 @@ class PackageManager:
 
             try:
                 # Try to open lock file to check if process is holding it
-                with open(f"{lock_file}.lock", 'r') as f:
+                with open(f"{lock_file}.lock", "r", encoding="utf-8") as f:
                     pid = f.read().strip()
 
                     if pid and pid.isdigit():
                         try:
                             # Check if process is still running
                             process = psutil.Process(int(pid))
-                            print(f"Lock file {lock_file} held by active process (PID: {pid}, name: {process.name()})")
+                            process_name = process.name()
+                            print(
+                                f"Lock file {lock_file} held by active process "
+                                f"(PID: {pid}, name: {process_name})"
+                            )
                         except psutil.NoSuchProcess:
                             # Process is dead, lock is stale
                             stale_locks.append(lock_file)
-                            print(f"Stale lock file detected: {lock_file} (PID {pid} not found)")
+                            print(
+                                f"Stale lock file detected: {lock_file} (PID {pid} not found)"
+                            )
             except (FileNotFoundError, PermissionError):
                 # No lock file or can't read it
                 pass
@@ -81,7 +87,9 @@ class PackageManager:
             return True
 
         if os.geteuid() != 0:
-            print("Error: Root privileges required to release lock files", file=sys.stderr)
+            print(
+                "Error: Root privileges required to release lock files", file=sys.stderr
+            )
             return False
 
         for lock_file in stale_files:
@@ -98,7 +106,7 @@ class PackageManager:
                 ["dpkg", "--configure", "-a"],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             print("Reconfigured packages after lock release")
         except subprocess.CalledProcessError as e:
@@ -113,19 +121,12 @@ class PackageManager:
         Returns:
             Dict with repository check results
         """
-        result = {
-            "all_accessible": True,
-            "repositories": [],
-            "failures": []
-        }
+        result = {"all_accessible": True, "repositories": [], "failures": []}
 
         try:
             # Get list of repositories
             sources_result = subprocess.run(
-                ["apt-cache", "policy"],
-                capture_output=True,
-                text=True,
-                check=True
+                ["apt-cache", "policy"], capture_output=True, text=True, check=True
             )
 
             # Extract repository URLs
@@ -140,38 +141,49 @@ class PackageManager:
                 try:
                     # Try HTTP HEAD request to repository
                     test_result = subprocess.run(
-                        ["curl", "-I", "-s", "-o", "/dev/null", "-w", "%{http_code}", repo_url],
+                        [
+                            "curl",
+                            "-I",
+                            "-s",
+                            "-o",
+                            "/dev/null",
+                            "-w",
+                            "%{http_code}",
+                            repo_url,
+                        ],
                         capture_output=True,
                         text=True,
                         timeout=10,
-                        check=False
+                        check=False,
                     )
 
                     http_code = test_result.stdout.strip()
 
                     if http_code.startswith("2") or http_code.startswith("3"):
-                        result["repositories"].append({
-                            "url": repo_url,
-                            "accessible": True,
-                            "http_code": http_code
-                        })
+                        result["repositories"].append(
+                            {
+                                "url": repo_url,
+                                "accessible": True,
+                                "http_code": http_code,
+                            }
+                        )
                     else:
                         result["all_accessible"] = False
                         result["failures"].append(repo_url)
-                        result["repositories"].append({
-                            "url": repo_url,
-                            "accessible": False,
-                            "http_code": http_code
-                        })
+                        result["repositories"].append(
+                            {
+                                "url": repo_url,
+                                "accessible": False,
+                                "http_code": http_code,
+                            }
+                        )
 
                 except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
                     result["all_accessible"] = False
                     result["failures"].append(repo_url)
-                    result["repositories"].append({
-                        "url": repo_url,
-                        "accessible": False,
-                        "error": str(e)
-                    })
+                    result["repositories"].append(
+                        {"url": repo_url, "accessible": False, "error": str(e)}
+                    )
 
         except subprocess.CalledProcessError as e:
             result["error"] = f"Failed to check repositories: {e.stderr}"
@@ -192,7 +204,7 @@ class PackageManager:
                 capture_output=True,
                 text=True,
                 check=True,
-                env={"DEBIAN_FRONTEND": "noninteractive"}
+                env={"DEBIAN_FRONTEND": "noninteractive"},
             )
 
             return (True, result.stdout)
@@ -204,7 +216,7 @@ class PackageManager:
                     ["dpkg", "--configure", "-a"],
                     capture_output=True,
                     text=True,
-                    check=True
+                    check=True,
                 )
 
                 # Try fix-broken again
@@ -213,7 +225,7 @@ class PackageManager:
                     capture_output=True,
                     text=True,
                     check=True,
-                    env={"DEBIAN_FRONTEND": "noninteractive"}
+                    env={"DEBIAN_FRONTEND": "noninteractive"},
                 )
 
                 return (True, result.stdout)
@@ -227,7 +239,7 @@ class PackageManager:
             return True
 
         try:
-            result = subprocess.run(
+            subprocess.run(
                 ["apt-get", "update", "-qq"], capture_output=True, text=True, check=True
             )
             self.apt_cache_updated = True
@@ -505,10 +517,7 @@ def main():
 
     elif command == "check-lock":
         has_stale, stale_files = pm.check_stale_lock()
-        result = {
-            "has_stale_locks": has_stale,
-            "stale_files": stale_files
-        }
+        result = {"has_stale_locks": has_stale, "stale_files": stale_files}
         print(json.dumps(result, indent=2))
         sys.exit(1 if has_stale else 0)
 

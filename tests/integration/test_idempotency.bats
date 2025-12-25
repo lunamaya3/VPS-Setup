@@ -266,8 +266,11 @@ collect_system_state() {
   [ "${second_run_duration}" -lt 2 ]
   
   # Verify second run is significantly faster (< 1/3 of first run time)
-  speedup_factor=$((first_run_duration / second_run_duration))
-  [ "${speedup_factor}" -ge 3 ]
+  # Avoid division by zero
+  if [ "${second_run_duration}" -gt 0 ]; then
+    speedup_factor=$((first_run_duration / second_run_duration))
+    [ "${speedup_factor}" -ge 3 ]
+  fi
 }
 
 # Test: System state unchanged after second run

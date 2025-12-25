@@ -52,25 +52,25 @@ readonly SSH_PORT="${SSH_PORT:-22}"
 #   1 - Prerequisites failed
 rdp_server_check_prerequisites() {
   log_info "Checking RDP server prerequisites"
-  
+
   # Verify desktop-install phase completed
   if ! checkpoint_exists "desktop-install"; then
     log_error "Desktop environment must be installed before RDP server"
     return 1
   fi
-  
+
   # Verify XFCE is installed
-  if ! command -v startxfce4 &> /dev/null; then
+  if ! command -v startxfce4 &>/dev/null; then
     log_error "XFCE desktop environment not found"
     return 1
   fi
-  
+
   # Check OpenSSL is available for certificate generation
-  if ! command -v openssl &> /dev/null; then
+  if ! command -v openssl &>/dev/null; then
     log_error "OpenSSL not found (required for TLS certificates)"
     return 1
   fi
-  
+
   log_info "Prerequisites check passed"
   return 0
 }
@@ -84,29 +84,29 @@ rdp_server_check_prerequisites() {
 rdp_server_install_packages() {
   log_info "Installing xrdp packages"
   progress_update "Installing RDP server" 15
-  
+
   export DEBIAN_FRONTEND=noninteractive
-  
+
   local -a rdp_packages=(
     "xrdp"
     "xorgxrdp"
   )
-  
+
   for package in "${rdp_packages[@]}"; do
     if dpkg -l | grep -q "^ii  ${package}"; then
       log_info "Package ${package} already installed"
       continue
     fi
-    
+
     log_info "Installing package: ${package}"
     if ! apt-get install -y "${package}" 2>&1 | tee -a "${LOG_FILE}"; then
       log_error "Failed to install package: ${package}"
       return 1
     fi
-    
+
     transaction_log "apt-get remove -y ${package}"
   done
-  
+
   # Verify installations
   for package in "${rdp_packages[@]}"; do
     if ! dpkg -l | grep -q "^ii  ${package}"; then
@@ -114,7 +114,7 @@ rdp_server_install_packages() {
       return 1
     fi
   done
-  
+
   log_info "xrdp packages installed successfully"
   progress_update "RDP packages installed" 30
   return 0
@@ -129,11 +129,11 @@ rdp_server_install_packages() {
 rdp_server_generate_certificates() {
   log_info "Generating TLS certificates for xrdp"
   progress_update "Generating TLS certificates" 40
-  
+
   # Check if certificates already exist
   if [[ -f "${CERT_FILE}" && -f "${KEY_FILE}" ]]; then
     log_info "TLS certificates already exist"
-    
+
     # Verify certificate validity (at least 30 days remaining)
     local expiry_date
     expiry_date=$(openssl x509 -in "${CERT_FILE}" -noout -enddate | cut -d= -f2)
@@ -141,8 +141,8 @@ rdp_server_generate_certificates() {
     expiry_epoch=$(date -d "${expiry_date}" +%s 2>/dev/null || echo 0)
     local now_epoch
     now_epoch=$(date +%s)
-    local days_remaining=$(( (expiry_epoch - now_epoch) / 86400 ))
-    
+    local days_remaining=$(((expiry_epoch - now_epoch) / 86400))
+
     if [[ ${days_remaining} -gt 30 ]]; then
       log_info "Existing certificates valid for ${days_remaining} days"
       return 0
@@ -150,7 +150,7 @@ rdp_server_generate_certificates() {
       log_warning "Certificates expiring soon (${days_remaining} days), regenerating"
     fi
   fi
-  
+
   # Backup existing certificates if present
   if [[ -f "${CERT_FILE}" ]]; then
     transaction_log "mv ${CERT_FILE}.vps-backup ${CERT_FILE}"
@@ -160,12 +160,12 @@ rdp_server_generate_certificates() {
     transaction_log "mv ${KEY_FILE}.vps-backup ${KEY_FILE}"
     mv "${KEY_FILE}" "${KEY_FILE}.vps-backup"
   fi
-  
+
   # Generate new self-signed certificate (valid for 10 years)
   # SEC-007: Use 4096-bit RSA for strong encryption
   local hostname
   hostname=$(hostname -f 2>/dev/null || hostname)
-  
+
   log_info "Generating 4096-bit RSA self-signed certificate (SEC-007)"
   if ! openssl req -x509 -newkey rsa:4096 \
     -keyout "${KEY_FILE}" \
@@ -176,14 +176,14 @@ rdp_server_generate_certificates() {
     log_error "Failed to generate TLS certificates"
     return 1
   fi
-  
+
   # Set proper permissions
   chmod 600 "${KEY_FILE}"
   chmod 644 "${CERT_FILE}"
   chown xrdp:xrdp "${KEY_FILE}" "${CERT_FILE}"
-  
+
   transaction_log "rm -f ${CERT_FILE} ${KEY_FILE}"
-  
+
   log_info "TLS certificates generated successfully"
   return 0
 }
@@ -197,15 +197,15 @@ rdp_server_generate_certificates() {
 rdp_server_configure_xrdp() {
   log_info "Configuring xrdp server"
   progress_update "Configuring xrdp" 50
-  
+
   # Backup original configuration
   if [[ -f "${XRDP_INI}" && ! -f "${XRDP_INI}.vps-backup" ]]; then
     transaction_log "mv ${XRDP_INI}.vps-backup ${XRDP_INI}"
     cp "${XRDP_INI}" "${XRDP_INI}.vps-backup"
   fi
-  
+
   # Create optimized xrdp configuration
-  cat > "${XRDP_INI}" <<EOF
+  cat >"${XRDP_INI}" <<EOF
 ; VPS-PROVISION CONFIGURED xrdp.ini
 [Globals]
 ini_version=1
@@ -246,9 +246,9 @@ ip=127.0.0.1
 port=-1
 chansrvport=DISPLAY(10)
 EOF
-  
+
   transaction_log "mv ${XRDP_INI}.vps-backup ${XRDP_INI}"
-  
+
   log_info "xrdp configuration completed"
   return 0
 }
@@ -262,15 +262,15 @@ EOF
 rdp_server_configure_sesman() {
   log_info "Configuring xrdp session manager"
   progress_update "Configuring session manager" 60
-  
+
   # Backup original configuration
   if [[ -f "${SESMAN_INI}" && ! -f "${SESMAN_INI}.vps-backup" ]]; then
     transaction_log "mv ${SESMAN_INI}.vps-backup ${SESMAN_INI}"
     cp "${SESMAN_INI}" "${SESMAN_INI}.vps-backup"
   fi
-  
+
   # Create session manager configuration
-  cat > "${SESMAN_INI}" <<EOF
+  cat >"${SESMAN_INI}" <<EOF
 ; VPS-PROVISION CONFIGURED sesman.ini
 [Globals]
 ListenAddress=127.0.0.1
@@ -311,9 +311,9 @@ param=-nolisten
 param=tcp
 param=-uds
 EOF
-  
+
   transaction_log "mv ${SESMAN_INI}.vps-backup ${SESMAN_INI}"
-  
+
   log_info "Session manager configuration completed"
   return 0
 }
@@ -327,9 +327,9 @@ EOF
 rdp_server_configure_firewall() {
   log_info "Configuring firewall rules"
   progress_update "Configuring firewall" 70
-  
+
   # Check if ufw is installed
-  if ! command -v ufw &> /dev/null; then
+  if ! command -v ufw &>/dev/null; then
     log_info "Installing UFW firewall"
     apt-get install -y ufw 2>&1 | tee -a "${LOG_FILE}" || {
       log_error "Failed to install UFW"
@@ -337,19 +337,19 @@ rdp_server_configure_firewall() {
     }
     transaction_log "apt-get remove -y ufw"
   fi
-  
+
   # Reset firewall to defaults (only on first configuration)
   if ! ufw status | grep -q "Status: active"; then
     log_info "Initializing firewall rules"
     ufw --force reset 2>&1 | tee -a "${LOG_FILE}"
-    
+
     # Set default policies
     ufw default deny incoming 2>&1 | tee -a "${LOG_FILE}"
     ufw default allow outgoing 2>&1 | tee -a "${LOG_FILE}"
-    
+
     transaction_log "ufw --force disable"
   fi
-  
+
   # Allow SSH (critical - do not block)
   if ! ufw status | grep -q "${SSH_PORT}/tcp.*ALLOW"; then
     log_info "Allowing SSH port ${SSH_PORT}"
@@ -357,7 +357,7 @@ rdp_server_configure_firewall() {
   else
     log_info "SSH port ${SSH_PORT} already allowed"
   fi
-  
+
   # Allow RDP
   if ! ufw status | grep -q "${RDP_PORT}/tcp.*ALLOW"; then
     log_info "Allowing RDP port ${RDP_PORT}"
@@ -365,17 +365,17 @@ rdp_server_configure_firewall() {
   else
     log_info "RDP port ${RDP_PORT} already allowed"
   fi
-  
+
   # Enable firewall
   if ! ufw status | grep -q "Status: active"; then
     log_info "Enabling firewall"
     echo "y" | ufw enable 2>&1 | tee -a "${LOG_FILE}"
   fi
-  
+
   # Verify rules
   log_info "Firewall rules configured:"
   ufw status numbered 2>&1 | tee -a "${LOG_FILE}"
-  
+
   log_info "Firewall configuration completed"
   return 0
 }
@@ -389,21 +389,21 @@ rdp_server_configure_firewall() {
 rdp_server_enable_services() {
   log_info "Enabling xrdp services"
   progress_update "Enabling RDP services" 85
-  
+
   local -a services=("xrdp" "xrdp-sesman")
-  
+
   for service in "${services[@]}"; do
     # Enable service
-    if ! systemctl is-enabled "${service}" &> /dev/null; then
+    if ! systemctl is-enabled "${service}" &>/dev/null; then
       log_info "Enabling service: ${service}"
       systemctl enable "${service}" 2>&1 | tee -a "${LOG_FILE}"
       transaction_log "systemctl disable ${service}"
     else
       log_info "Service ${service} already enabled"
     fi
-    
+
     # Start or restart service
-    if systemctl is-active "${service}" &> /dev/null; then
+    if systemctl is-active "${service}" &>/dev/null; then
       log_info "Restarting service: ${service}"
       systemctl restart "${service}" 2>&1 | tee -a "${LOG_FILE}"
     else
@@ -411,15 +411,15 @@ rdp_server_enable_services() {
       systemctl start "${service}" 2>&1 | tee -a "${LOG_FILE}"
       transaction_log "systemctl stop ${service}"
     fi
-    
+
     # Verify service is running
-    if ! systemctl is-active "${service}" &> /dev/null; then
+    if ! systemctl is-active "${service}" &>/dev/null; then
       log_error "Failed to start service: ${service}"
       systemctl status "${service}" 2>&1 | tee -a "${LOG_FILE}"
       return 1
     fi
   done
-  
+
   log_info "xrdp services enabled and started"
   return 0
 }
@@ -433,37 +433,37 @@ rdp_server_enable_services() {
 rdp_server_validate_installation() {
   log_info "Validating RDP server installation"
   progress_update "Validating installation" 95
-  
+
   # Check xrdp service is active
-  if ! systemctl is-active xrdp &> /dev/null; then
+  if ! systemctl is-active xrdp &>/dev/null; then
     log_error "xrdp service is not active"
     return 1
   fi
-  
+
   # Check xrdp-sesman service is active
-  if ! systemctl is-active xrdp-sesman &> /dev/null; then
+  if ! systemctl is-active xrdp-sesman &>/dev/null; then
     log_error "xrdp-sesman service is not active"
     return 1
   fi
-  
+
   # Check port 3389 is listening
   if ! ss -tuln | grep -q ":${RDP_PORT}"; then
     log_error "RDP port ${RDP_PORT} is not listening"
     ss -tuln | grep ":${RDP_PORT}" 2>&1 | tee -a "${LOG_FILE}"
     return 1
   fi
-  
+
   # Check TLS certificates exist with correct permissions
   if [[ ! -f "${CERT_FILE}" ]]; then
     log_error "TLS certificate not found: ${CERT_FILE}"
     return 1
   fi
-  
+
   if [[ ! -f "${KEY_FILE}" ]]; then
     log_error "TLS key not found: ${KEY_FILE}"
     return 1
   fi
-  
+
   # Verify key permissions (must be 600)
   local key_perms
   key_perms=$(stat -c "%a" "${KEY_FILE}")
@@ -471,31 +471,31 @@ rdp_server_validate_installation() {
     log_error "Incorrect key file permissions: ${key_perms} (expected 600)"
     return 1
   fi
-  
+
   # Verify firewall rules
-  if command -v ufw &> /dev/null; then
+  if command -v ufw &>/dev/null; then
     if ! ufw status | grep -q "${RDP_PORT}/tcp.*ALLOW"; then
       log_error "RDP port not allowed in firewall"
       return 1
     fi
-    
+
     if ! ufw status | grep -q "${SSH_PORT}/tcp.*ALLOW"; then
       log_error "SSH port not allowed in firewall (critical)"
       return 1
     fi
   fi
-  
+
   # Verify configuration files contain expected markers
   if ! grep -q "VPS-PROVISION CONFIGURED" "${XRDP_INI}"; then
     log_error "xrdp.ini does not contain expected configuration"
     return 1
   fi
-  
+
   if ! grep -q "VPS-PROVISION CONFIGURED" "${SESMAN_INI}"; then
     log_error "sesman.ini does not contain expected configuration"
     return 1
   fi
-  
+
   log_info "RDP server validation passed"
   return 0
 }
@@ -509,14 +509,14 @@ rdp_server_validate_installation() {
 rdp_server_execute() {
   log_info "Starting RDP server installation"
   progress_start "RDP Server Setup"
-  
+
   # Check if already completed
   if checkpoint_exists "${RDP_SERVER_PHASE}"; then
     log_info "RDP server already configured (checkpoint exists)"
     progress_complete "RDP server (cached)"
     return 0
   fi
-  
+
   # Execute installation steps
   rdp_server_check_prerequisites || return 1
   rdp_server_install_packages || return 1
@@ -526,13 +526,13 @@ rdp_server_execute() {
   rdp_server_configure_firewall || return 1
   rdp_server_enable_services || return 1
   rdp_server_validate_installation || return 1
-  
+
   # Create checkpoint
   checkpoint_create "${RDP_SERVER_PHASE}" || {
     log_error "Failed to create checkpoint"
     return 1
   }
-  
+
   progress_complete "RDP server configured"
   log_info "RDP server installation completed successfully"
   log_info "RDP access available on port ${RDP_PORT}"

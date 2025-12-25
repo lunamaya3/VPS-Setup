@@ -44,10 +44,10 @@ parallel_ide_init() {
       return 1
     }
   fi
-  
+
   # Clear any previous result files
   rm -f "$VSCODE_RESULT_FILE" "$CURSOR_RESULT_FILE" "$ANTIGRAVITY_RESULT_FILE"
-  
+
   log_debug "Parallel IDE installation environment initialized"
   return 0
 }
@@ -69,9 +69,9 @@ parallel_ide_cleanup() {
 #######################################
 parallel_ide_install_vscode() {
   local result=0
-  
+
   log_info "[VSCode] Starting installation in parallel..."
-  
+
   if ide_vscode_execute; then
     log_info "[VSCode] Installation completed successfully"
     result=0
@@ -79,8 +79,8 @@ parallel_ide_install_vscode() {
     log_error "[VSCode] Installation failed"
     result=1
   fi
-  
-  echo "$result" > "$VSCODE_RESULT_FILE"
+
+  echo "$result" >"$VSCODE_RESULT_FILE"
   exit "$result"
 }
 
@@ -90,9 +90,9 @@ parallel_ide_install_vscode() {
 #######################################
 parallel_ide_install_cursor() {
   local result=0
-  
+
   log_info "[Cursor] Starting installation in parallel..."
-  
+
   if ide_cursor_execute; then
     log_info "[Cursor] Installation completed successfully"
     result=0
@@ -100,8 +100,8 @@ parallel_ide_install_cursor() {
     log_error "[Cursor] Installation failed"
     result=1
   fi
-  
-  echo "$result" > "$CURSOR_RESULT_FILE"
+
+  echo "$result" >"$CURSOR_RESULT_FILE"
   exit "$result"
 }
 
@@ -111,9 +111,9 @@ parallel_ide_install_cursor() {
 #######################################
 parallel_ide_install_antigravity() {
   local result=0
-  
+
   log_info "[Antigravity] Starting installation in parallel..."
-  
+
   if ide_antigravity_execute; then
     log_info "[Antigravity] Installation completed successfully"
     result=0
@@ -121,15 +121,15 @@ parallel_ide_install_antigravity() {
     log_error "[Antigravity] Installation failed"
     result=1
   fi
-  
-  echo "$result" > "$ANTIGRAVITY_RESULT_FILE"
+
+  echo "$result" >"$ANTIGRAVITY_RESULT_FILE"
   exit "$result"
 }
 
 #######################################
 # Execute all IDE installations in parallel
 # T131: Parallel IDE installation to save ~3 minutes
-# 
+#
 # Downloads are sequential (one at a time) to avoid bandwidth saturation,
 # but installation/extraction happens in parallel (per performance-specs.md)
 #
@@ -140,50 +140,50 @@ parallel_ide_execute() {
   log_info "=== Starting Parallel IDE Installation ==="
   log_info "Installing VSCode, Cursor, and Antigravity concurrently..."
   log_info "Expected time savings: ~3 minutes vs sequential installation"
-  
+
   # Initialize environment
   if ! parallel_ide_init; then
     return 1
   fi
-  
+
   local start_time
   start_time=$(date +%s)
-  
+
   # Launch IDE installations in background
   (parallel_ide_install_vscode) &
   local pid_vscode=$!
-  
+
   (parallel_ide_install_cursor) &
   local pid_cursor=$!
-  
+
   (parallel_ide_install_antigravity) &
   local pid_antigravity=$!
-  
+
   log_info "Background installation PIDs: VSCode=$pid_vscode, Cursor=$pid_cursor, Antigravity=$pid_antigravity"
-  
+
   # Wait for all installations to complete
   log_info "Waiting for all IDE installations to complete..."
-  
+
   wait $pid_vscode
   local result_vscode=$?
-  
+
   wait $pid_cursor
   local result_cursor=$?
-  
+
   wait $pid_antigravity
   local result_antigravity=$?
-  
+
   # Calculate total time
   local end_time
   end_time=$(date +%s)
   local duration=$((end_time - start_time))
-  
+
   log_info "Parallel IDE installation completed in ${duration}s"
-  
+
   # Check results
   local failed_count=0
   local success_count=0
-  
+
   if [[ $result_vscode -eq 0 ]]; then
     log_info "✓ VSCode installation: SUCCESS"
     ((success_count++))
@@ -191,7 +191,7 @@ parallel_ide_execute() {
     log_error "✗ VSCode installation: FAILED (exit code: $result_vscode)"
     ((failed_count++))
   fi
-  
+
   if [[ $result_cursor -eq 0 ]]; then
     log_info "✓ Cursor installation: SUCCESS"
     ((success_count++))
@@ -199,7 +199,7 @@ parallel_ide_execute() {
     log_error "✗ Cursor installation: FAILED (exit code: $result_cursor)"
     ((failed_count++))
   fi
-  
+
   if [[ $result_antigravity -eq 0 ]]; then
     log_info "✓ Antigravity installation: SUCCESS"
     ((success_count++))
@@ -207,21 +207,21 @@ parallel_ide_execute() {
     log_error "✗ Antigravity installation: FAILED (exit code: $result_antigravity)"
     ((failed_count++))
   fi
-  
+
   # Cleanup
   parallel_ide_cleanup
-  
+
   # Report results
   log_info "=== Parallel IDE Installation Summary ==="
   log_info "Success: $success_count / 3"
   log_info "Failed:  $failed_count / 3"
   log_info "Duration: ${duration}s"
-  
+
   if [[ $failed_count -gt 0 ]]; then
     log_error "Parallel IDE installation completed with failures"
     return 1
   fi
-  
+
   log_info "=== All IDEs Installed Successfully ==="
   return 0
 }
@@ -233,22 +233,22 @@ parallel_ide_execute() {
 #######################################
 parallel_ide_check_all_installed() {
   local all_installed=true
-  
+
   if ! checkpoint_exists "ide-vscode"; then
     log_debug "VSCode not yet installed (no checkpoint)"
     all_installed=false
   fi
-  
+
   if ! checkpoint_exists "ide-cursor"; then
     log_debug "Cursor not yet installed (no checkpoint)"
     all_installed=false
   fi
-  
+
   if ! checkpoint_exists "ide-antigravity"; then
     log_debug "Antigravity not yet installed (no checkpoint)"
     all_installed=false
   fi
-  
+
   if $all_installed; then
     return 0
   else

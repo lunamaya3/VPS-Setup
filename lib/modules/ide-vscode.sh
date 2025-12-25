@@ -34,25 +34,25 @@ readonly VSCODE_DESKTOP="${VSCODE_DESKTOP:-/usr/share/applications/code.desktop}
 #   0 if prerequisites met, 1 otherwise
 #######################################
 ide_vscode_check_prerequisites() {
-    log_info "Checking VSCode prerequisites..."
-    
-    # Verify desktop environment is installed
-    if ! checkpoint_exists "desktop-install"; then
-        log_error "Desktop environment not installed (checkpoint missing: desktop-install)"
-        return 1
+  log_info "Checking VSCode prerequisites..."
+
+  # Verify desktop environment is installed
+  if ! checkpoint_exists "desktop-install"; then
+    log_error "Desktop environment not installed (checkpoint missing: desktop-install)"
+    return 1
+  fi
+
+  # Verify required commands
+  local required_cmds=("wget" "gpg" "apt-get" "dpkg")
+  for cmd in "${required_cmds[@]}"; do
+    if ! command -v "$cmd" &>/dev/null; then
+      log_error "Required command not found: $cmd"
+      return 1
     fi
-    
-    # Verify required commands
-    local required_cmds=("wget" "gpg" "apt-get" "dpkg")
-    for cmd in "${required_cmds[@]}"; do
-        if ! command -v "$cmd" &>/dev/null; then
-            log_error "Required command not found: $cmd"
-            return 1
-        fi
-    done
-    
-    log_info "VSCode prerequisites check passed"
-    return 0
+  done
+
+  log_info "VSCode prerequisites check passed"
+  return 0
 }
 
 #######################################
@@ -65,34 +65,34 @@ ide_vscode_check_prerequisites() {
 #   0 on success, 1 on failure
 #######################################
 ide_vscode_add_gpg_key() {
-    log_info "Adding Microsoft GPG key..."
-    
-    # Check if key already exists
-    if [[ -f "$VSCODE_GPG_KEY" ]]; then
-        log_info "Microsoft GPG key already exists"
-        return 0
+  log_info "Adding Microsoft GPG key..."
+
+  # Check if key already exists
+  if [[ -f "$VSCODE_GPG_KEY" ]]; then
+    log_info "Microsoft GPG key already exists"
+    return 0
+  fi
+
+  # Download and install GPG key with retry
+  local max_retries=3
+  local retry_count=0
+
+  while ((retry_count < max_retries)); do
+    if wget -qO- "$VSCODE_GPG_URL" | gpg --dearmor >"$VSCODE_GPG_KEY"; then
+      transaction_log "gpg_key_add" "rm -f '$VSCODE_GPG_KEY'"
+      log_info "Microsoft GPG key added successfully"
+      return 0
     fi
-    
-    # Download and install GPG key with retry
-    local max_retries=3
-    local retry_count=0
-    
-    while (( retry_count < max_retries )); do
-        if wget -qO- "$VSCODE_GPG_URL" | gpg --dearmor > "$VSCODE_GPG_KEY"; then
-            transaction_log "gpg_key_add" "rm -f '$VSCODE_GPG_KEY'"
-            log_info "Microsoft GPG key added successfully"
-            return 0
-        fi
-        
-        retry_count=$((retry_count + 1))
-        if (( retry_count < max_retries )); then
-            log_warning "Failed to download GPG key (attempt $retry_count/$max_retries), retrying..."
-            sleep 2
-        fi
-    done
-    
-    log_error "Failed to add Microsoft GPG key after $max_retries attempts"
-    return 1
+
+    retry_count=$((retry_count + 1))
+    if ((retry_count < max_retries)); then
+      log_warning "Failed to download GPG key (attempt $retry_count/$max_retries), retrying..."
+      sleep 2
+    fi
+  done
+
+  log_error "Failed to add Microsoft GPG key after $max_retries attempts"
+  return 1
 }
 
 #######################################
@@ -105,23 +105,23 @@ ide_vscode_add_gpg_key() {
 #   0 on success, 1 on failure
 #######################################
 ide_vscode_add_repository() {
-    log_info "Adding VSCode repository..."
-    
-    # Check if repository already exists
-    if [[ -f "$VSCODE_LIST" ]]; then
-        log_info "VSCode repository already configured"
-        return 0
-    fi
-    
-    # Add repository
-    if ! echo "$VSCODE_REPO" > "$VSCODE_LIST"; then
-        log_error "Failed to add VSCode repository"
-        return 1
-    fi
-    
-    transaction_log "repo_add" "rm -f '$VSCODE_LIST'"
-    log_info "VSCode repository added successfully"
+  log_info "Adding VSCode repository..."
+
+  # Check if repository already exists
+  if [[ -f "$VSCODE_LIST" ]]; then
+    log_info "VSCode repository already configured"
     return 0
+  fi
+
+  # Add repository
+  if ! echo "$VSCODE_REPO" >"$VSCODE_LIST"; then
+    log_error "Failed to add VSCode repository"
+    return 1
+  fi
+
+  transaction_log "repo_add" "rm -f '$VSCODE_LIST'"
+  log_info "VSCode repository added successfully"
+  return 0
 }
 
 #######################################
@@ -134,15 +134,15 @@ ide_vscode_add_repository() {
 #   0 on success, 1 on failure
 #######################################
 ide_vscode_update_apt() {
-    log_info "Updating APT cache..."
-    
-    if ! apt-get update 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
-        log_error "Failed to update APT cache"
-        return 1
-    fi
-    
-    log_info "APT cache updated successfully"
-    return 0
+  log_info "Updating APT cache..."
+
+  if ! apt-get update 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
+    log_error "Failed to update APT cache"
+    return 1
+  fi
+
+  log_info "APT cache updated successfully"
+  return 0
 }
 
 #######################################
@@ -155,26 +155,26 @@ ide_vscode_update_apt() {
 #   0 if signature valid, 1 otherwise
 #######################################
 ide_vscode_verify_signature() {
-    log_info "Verifying GPG signature of VSCode package (SEC-017)..."
-    
-    # Check if code package is installed and verify its signature via dpkg
-    if ! dpkg -l code 2>/dev/null | grep -q "^ii"; then
-        log_error "VSCode package not installed, cannot verify signature"
-        return 1
-    fi
-    
-    # Verify package signature using apt-cache policy to confirm it's from trusted repo
-    local origin
-    origin=$(apt-cache policy code 2>/dev/null | grep -A1 "Installed:" | grep -o "packages.microsoft.com" || true)
-    
-    if [[ -z "$origin" ]]; then
-        log_warning "Could not verify VSCode package origin from Microsoft repository"
-        # Don't fail as package may have been installed via other means
-        return 0
-    fi
-    
-    log_info "VSCode package signature verified from Microsoft repository"
+  log_info "Verifying GPG signature of VSCode package (SEC-017)..."
+
+  # Check if code package is installed and verify its signature via dpkg
+  if ! dpkg -l code 2>/dev/null | grep -q "^ii"; then
+    log_error "VSCode package not installed, cannot verify signature"
+    return 1
+  fi
+
+  # Verify package signature using apt-cache policy to confirm it's from trusted repo
+  local origin
+  origin=$(apt-cache policy code 2>/dev/null | grep -A1 "Installed:" | grep -o "packages.microsoft.com" || true)
+
+  if [[ -z "$origin" ]]; then
+    log_warning "Could not verify VSCode package origin from Microsoft repository"
+    # Don't fail as package may have been installed via other means
     return 0
+  fi
+
+  log_info "VSCode package signature verified from Microsoft repository"
+  return 0
 }
 
 #######################################
@@ -187,31 +187,31 @@ ide_vscode_verify_signature() {
 #   0 on success, 1 on failure
 #######################################
 ide_vscode_install_package() {
-    log_info "Installing VSCode package..."
-    
-    # Check if already installed
-    if dpkg -l code 2>/dev/null | grep -q "^ii"; then
-        log_info "VSCode package already installed"
-        return 0
-    fi
-    
-    # Install with auto-fix for dependencies
-    if ! DEBIAN_FRONTEND=noninteractive apt-get install -y --fix-broken code 2>&1 | \
-         tee -a "${LOG_FILE:-/dev/null}"; then
-        log_error "Failed to install VSCode package"
-        return 1
-    fi
-    
-    transaction_log "package_install" "apt-get remove -y code"
-    log_info "VSCode package installed successfully"
-    
-    # SEC-017: Verify GPG signature after installation
-    if ! ide_vscode_verify_signature; then
-        log_error "GPG signature verification failed for VSCode package"
-        return 1
-    fi
-    
+  log_info "Installing VSCode package..."
+
+  # Check if already installed
+  if dpkg -l code 2>/dev/null | grep -q "^ii"; then
+    log_info "VSCode package already installed"
     return 0
+  fi
+
+  # Install with auto-fix for dependencies
+  if ! DEBIAN_FRONTEND=noninteractive apt-get install -y --fix-broken code 2>&1 |
+    tee -a "${LOG_FILE:-/dev/null}"; then
+    log_error "Failed to install VSCode package"
+    return 1
+  fi
+
+  transaction_log "package_install" "apt-get remove -y code"
+  log_info "VSCode package installed successfully"
+
+  # SEC-017: Verify GPG signature after installation
+  if ! ide_vscode_verify_signature; then
+    log_error "GPG signature verification failed for VSCode package"
+    return 1
+  fi
+
+  return 0
 }
 
 #######################################
@@ -224,33 +224,33 @@ ide_vscode_install_package() {
 #   0 if verification passes, 1 otherwise
 #######################################
 ide_vscode_verify() {
-    log_info "Verifying VSCode installation..."
-    
-    # Check executable exists
-    if ! command -v code &>/dev/null; then
-        log_error "VSCode command 'code' not found in PATH"
-        return 1
-    fi
-    
-    # Check version (brief launch)
-    if ! timeout 10 code --version &>/dev/null; then
-        log_error "VSCode version check failed (--version command failed)"
-        return 1
-    fi
-    
-    # Check desktop launcher exists
-    if [[ ! -f "$VSCODE_DESKTOP" ]]; then
-        log_warning "VSCode desktop launcher not found at $VSCODE_DESKTOP"
-    fi
-    
-    # Check package status
-    if ! dpkg -l code 2>/dev/null | grep -q "^ii"; then
-        log_error "VSCode package not properly installed (dpkg status check failed)"
-        return 1
-    fi
-    
-    log_info "VSCode verification passed"
-    return 0
+  log_info "Verifying VSCode installation..."
+
+  # Check executable exists
+  if ! command -v code &>/dev/null; then
+    log_error "VSCode command 'code' not found in PATH"
+    return 1
+  fi
+
+  # Check version (brief launch)
+  if ! timeout 10 code --version &>/dev/null; then
+    log_error "VSCode version check failed (--version command failed)"
+    return 1
+  fi
+
+  # Check desktop launcher exists
+  if [[ ! -f "$VSCODE_DESKTOP" ]]; then
+    log_warning "VSCode desktop launcher not found at $VSCODE_DESKTOP"
+  fi
+
+  # Check package status
+  if ! dpkg -l code 2>/dev/null | grep -q "^ii"; then
+    log_error "VSCode package not properly installed (dpkg status check failed)"
+    return 1
+  fi
+
+  log_info "VSCode verification passed"
+  return 0
 }
 
 #######################################
@@ -263,25 +263,25 @@ ide_vscode_verify() {
 #   0 on success, 1 on failure
 #######################################
 ide_vscode_configure() {
-    local username="${1:-devuser}"
-    log_info "Configuring VSCode for user: $username..."
-    
-    # Get user home directory
-    local user_home
-    user_home=$(getent passwd "$username" | cut -d: -f6)
-    
-    if [[ -z "$user_home" ]]; then
-        log_error "Cannot determine home directory for user: $username"
-        return 1
-    fi
-    
-    # Create VSCode config directory
-    local config_dir="$user_home/.config/Code/User"
-    mkdir -p "$config_dir"
-    
-    # Create settings.json with telemetry disabled
-    local settings_file="$config_dir/settings.json"
-    cat > "$settings_file" << 'EOF'
+  local username="${1:-devuser}"
+  log_info "Configuring VSCode for user: $username..."
+
+  # Get user home directory
+  local user_home
+  user_home=$(getent passwd "$username" | cut -d: -f6)
+
+  if [[ -z "$user_home" ]]; then
+    log_error "Cannot determine home directory for user: $username"
+    return 1
+  fi
+
+  # Create VSCode config directory
+  local config_dir="$user_home/.config/Code/User"
+  mkdir -p "$config_dir"
+
+  # Create settings.json with telemetry disabled
+  local settings_file="$config_dir/settings.json"
+  cat >"$settings_file" <<'EOF'
 {
   "telemetry.enableTelemetry": false,
   "telemetry.enableCrashReporter": false,
@@ -289,13 +289,13 @@ ide_vscode_configure() {
   "extensions.autoUpdate": false
 }
 EOF
-    
-    # Set proper ownership
-    chown -R "$username:$username" "$user_home/.config"
-    
-    transaction_log "vscode_config" "rm -rf '$config_dir'"
-    log_info "VSCode configuration completed for user: $username"
-    return 0
+
+  # Set proper ownership
+  chown -R "$username:$username" "$user_home/.config"
+
+  transaction_log "vscode_config" "rm -rf '$config_dir'"
+  log_info "VSCode configuration completed for user: $username"
+  return 0
 }
 
 #######################################
@@ -308,72 +308,72 @@ EOF
 #   0 on success, 1 on failure
 #######################################
 ide_vscode_execute() {
-    local username="${1:-devuser}"
-    
-    log_info "=== Starting VSCode Installation ==="
-    
-    # Check if already completed
-    if checkpoint_exists "$VSCODE_CHECKPOINT"; then
-        log_info "VSCode installation already completed (checkpoint exists)"
-        return 0
-    fi
-    
-    # Check prerequisites
-    if ! ide_vscode_check_prerequisites; then
-        log_error "VSCode prerequisites check failed"
-        return 1
-    fi
-    
-    # Add GPG key
-    if ! ide_vscode_add_gpg_key; then
-        log_error "Failed to add Microsoft GPG key"
-        return 1
-    fi
-    
-    # Add repository
-    if ! ide_vscode_add_repository; then
-        log_error "Failed to add VSCode repository"
-        return 1
-    fi
-    
-    # Update APT cache
-    if ! ide_vscode_update_apt; then
-        log_error "Failed to update APT cache"
-        return 1
-    fi
-    
-    # Install package
-    if ! ide_vscode_install_package; then
-        log_error "Failed to install VSCode package"
-        return 1
-    fi
-    
-    # Verify installation
-    if ! ide_vscode_verify; then
-        log_error "VSCode verification failed"
-        return 1
-    fi
-    
-    # Configure VSCode
-    if ! ide_vscode_configure "$username"; then
-        log_warning "VSCode configuration failed (non-critical)"
-    fi
-    
-    # Create checkpoint
-    checkpoint_create "$VSCODE_CHECKPOINT"
-    
-    log_info "=== VSCode Installation Completed Successfully ==="
+  local username="${1:-devuser}"
+
+  log_info "=== Starting VSCode Installation ==="
+
+  # Check if already completed
+  if checkpoint_exists "$VSCODE_CHECKPOINT"; then
+    log_info "VSCode installation already completed (checkpoint exists)"
     return 0
+  fi
+
+  # Check prerequisites
+  if ! ide_vscode_check_prerequisites; then
+    log_error "VSCode prerequisites check failed"
+    return 1
+  fi
+
+  # Add GPG key
+  if ! ide_vscode_add_gpg_key; then
+    log_error "Failed to add Microsoft GPG key"
+    return 1
+  fi
+
+  # Add repository
+  if ! ide_vscode_add_repository; then
+    log_error "Failed to add VSCode repository"
+    return 1
+  fi
+
+  # Update APT cache
+  if ! ide_vscode_update_apt; then
+    log_error "Failed to update APT cache"
+    return 1
+  fi
+
+  # Install package
+  if ! ide_vscode_install_package; then
+    log_error "Failed to install VSCode package"
+    return 1
+  fi
+
+  # Verify installation
+  if ! ide_vscode_verify; then
+    log_error "VSCode verification failed"
+    return 1
+  fi
+
+  # Configure VSCode
+  if ! ide_vscode_configure "$username"; then
+    log_warning "VSCode configuration failed (non-critical)"
+  fi
+
+  # Create checkpoint
+  checkpoint_create "$VSCODE_CHECKPOINT"
+
+  log_info "=== VSCode Installation Completed Successfully ==="
+  return 0
 }
 
 # Export functions for testing
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-    export -f ide_vscode_check_prerequisites
-    export -f ide_vscode_add_gpg_key
-    export -f ide_vscode_add_repository
-    export -f ide_vscode_update_apt
-    export -f ide_vscode_install_package
-    export -f ide_vscode_verify
-    export -f ide_vscode_configure
-    export -f ide_vscode_execute
+  export -f ide_vscode_check_prerequisites
+  export -f ide_vscode_add_gpg_key
+  export -f ide_vscode_add_repository
+  export -f ide_vscode_update_apt
+  export -f ide_vscode_install_package
+  export -f ide_vscode_verify
+  export -f ide_vscode_configure
+  export -f ide_vscode_execute
 fi

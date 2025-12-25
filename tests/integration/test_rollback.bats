@@ -24,6 +24,23 @@ setup() {
   log_debug() { echo "[DEBUG] $*" >> "${LOG_FILE}"; }
   export -f log_info log_error log_warning log_debug
   
+  # Mock systemctl to prevent interference with real services
+  systemctl() {
+    echo "Mocked systemctl $*" >> "${LOG_FILE}"
+    # Return inactive for is-active checks
+    if [[ "$1" == "is-active" ]]; then
+      return 1
+    fi
+    return 0
+  }
+  export -f systemctl
+  
+  # Mock id command to prevent user checks
+  id() {
+    return 1  # User doesn't exist in test
+  }
+  export -f id
+  
   # Unset sourcing guards to allow re-sourcing in tests
   unset _TRANSACTION_SH_LOADED 2>/dev/null || true
   unset _ROLLBACK_SH_LOADED 2>/dev/null || true

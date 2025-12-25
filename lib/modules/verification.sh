@@ -24,7 +24,7 @@ check_executable() { [[ -x "$1" ]]; }
 verification_check_services() {
   log_info "Verifying system services..."
   local services_ok=true
-  
+
   # Check xrdp service
   if systemctl is-active --quiet xrdp; then
     log_info "✓ xrdp service is running"
@@ -32,7 +32,7 @@ verification_check_services() {
     log_error "xrdp service is not running"
     services_ok=false
   fi
-  
+
   # Check lightdm service
   if systemctl is-active --quiet lightdm; then
     log_info "✓ lightdm service is running"
@@ -40,18 +40,18 @@ verification_check_services() {
     log_error "lightdm service is not running"
     services_ok=false
   fi
-  
+
   # Check sshd service
   if systemctl is-active --quiet ssh || systemctl is-active --quiet sshd; then
     log_info "✓ SSH service is running"
   else
     log_warning "SSH service status unclear"
   fi
-  
+
   if [[ "${services_ok}" == "false" ]]; then
     return 1
   fi
-  
+
   return 0
 }
 
@@ -59,7 +59,7 @@ verification_check_services() {
 verification_check_ides() {
   log_info "Verifying IDE installations..."
   local ides_ok=true
-  
+
   # Check VSCode
   if command -v code &>/dev/null; then
     log_info "✓ VSCode executable found"
@@ -73,7 +73,7 @@ verification_check_ides() {
     log_error "VSCode not found in PATH"
     ides_ok=false
   fi
-  
+
   # Check Cursor
   if command -v cursor &>/dev/null || check_executable "/opt/cursor/cursor"; then
     log_info "✓ Cursor executable found"
@@ -81,7 +81,7 @@ verification_check_ides() {
     log_error "Cursor not found"
     ides_ok=false
   fi
-  
+
   # Check Antigravity
   if command -v antigravity &>/dev/null || check_executable "/usr/local/bin/antigravity"; then
     log_info "✓ Antigravity executable found"
@@ -89,11 +89,11 @@ verification_check_ides() {
     log_error "Antigravity not found"
     ides_ok=false
   fi
-  
+
   if [[ "${ides_ok}" == "false" ]]; then
     return 1
   fi
-  
+
   return 0
 }
 
@@ -101,7 +101,7 @@ verification_check_ides() {
 verification_check_ports() {
   log_info "Verifying network port accessibility..."
   local ports_ok=true
-  
+
   # Check SSH port (22)
   if netstat -tuln 2>/dev/null | grep -q ":22 "; then
     log_info "✓ SSH port 22 is listening"
@@ -110,7 +110,7 @@ verification_check_ports() {
   else
     log_warning "SSH port 22 status unclear"
   fi
-  
+
   # Check RDP port (3389)
   if netstat -tuln 2>/dev/null | grep -q ":3389 "; then
     log_info "✓ RDP port 3389 is listening"
@@ -120,11 +120,11 @@ verification_check_ports() {
     log_error "RDP port 3389 not listening"
     ports_ok=false
   fi
-  
+
   if [[ "${ports_ok}" == "false" ]]; then
     return 1
   fi
-  
+
   return 0
 }
 
@@ -132,7 +132,7 @@ verification_check_ports() {
 verification_check_permissions() {
   log_info "Validating file permissions..."
   local perms_ok=true
-  
+
   # Check xrdp TLS certificates
   if check_file "/etc/xrdp/cert.pem"; then
     local cert_perms
@@ -143,7 +143,7 @@ verification_check_permissions() {
       log_warning "xrdp certificate permissions: ${cert_perms} (expected 644 or 600)"
     fi
   fi
-  
+
   # Check developer user home directory
   if check_dir "/home/devuser"; then
     local home_owner
@@ -155,11 +155,11 @@ verification_check_permissions() {
       perms_ok=false
     fi
   fi
-  
+
   if [[ "${perms_ok}" == "false" ]]; then
     return 1
   fi
-  
+
   return 0
 }
 
@@ -167,7 +167,7 @@ verification_check_permissions() {
 verification_check_configurations() {
   log_info "Validating configuration files..."
   local configs_ok=true
-  
+
   # Check xrdp configuration
   if check_file "/etc/xrdp/xrdp.ini"; then
     if grep -q "max_bpp=32" /etc/xrdp/xrdp.ini; then
@@ -179,70 +179,70 @@ verification_check_configurations() {
     log_error "xrdp.ini not found"
     configs_ok=false
   fi
-  
+
   # Check XFCE configuration
   if check_dir "/etc/xdg/xfce4" || check_dir "/home/devuser/.config/xfce4"; then
     log_info "✓ XFCE configuration directory exists"
   else
     log_warning "XFCE configuration directory not found"
   fi
-  
+
   if [[ "${configs_ok}" == "false" ]]; then
     return 1
   fi
-  
+
   return 0
 }
 
 # Main verification execution
 verification_execute() {
   log_info "Starting post-provisioning verification..."
-  
+
   # Check if already completed
   if checkpoint_exists "${VERIFICATION_PHASE}"; then
     log_info "Verification already completed (checkpoint exists)"
     return 0
   fi
-  
+
   # Start checkpoint
   checkpoint_start "${VERIFICATION_PHASE}"
-  
+
   local verification_failed=false
-  
+
   # Run all verification checks
   if ! verification_check_services; then
     log_error "Service verification failed"
     verification_failed=true
   fi
-  
+
   if ! verification_check_ides; then
     log_error "IDE verification failed"
     verification_failed=true
   fi
-  
+
   if ! verification_check_ports; then
     log_error "Port verification failed"
     verification_failed=true
   fi
-  
+
   if ! verification_check_permissions; then
     log_error "Permission verification failed"
     verification_failed=true
   fi
-  
+
   if ! verification_check_configurations; then
     log_error "Configuration verification failed"
     verification_failed=true
   fi
-  
+
   if [[ "${verification_failed}" == "true" ]]; then
     log_error "Verification phase failed"
     return 1
   fi
-  
+
   # Complete checkpoint
   checkpoint_complete "${VERIFICATION_PHASE}"
-  
+
   log_info "All verification checks passed!"
   return 0
 }

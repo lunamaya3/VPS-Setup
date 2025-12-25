@@ -33,19 +33,19 @@ benchmark_init() {
 benchmark_cpu() {
   log_info "Running CPU benchmark..."
   local start end duration ops
-  
+
   start=$(date +%s%N)
-  
+
   # Integer benchmark: count to 1 million
   local count=0
   while ((count < 1000000)); do
     ((count++))
   done
-  
+
   end=$(date +%s%N)
-  duration=$(( (end - start) / 1000000 ))  # Convert to milliseconds
-  ops=$(( 1000000 * 1000 / duration ))     # Operations per second
-  
+  duration=$(((end - start) / 1000000)) # Convert to milliseconds
+  ops=$((1000000 * 1000 / duration))    # Operations per second
+
   log_info "CPU benchmark: ${ops} ops/sec (${duration}ms)"
   echo "$ops"
 }
@@ -57,42 +57,42 @@ benchmark_disk_io() {
   local test_file="${BENCHMARK_DIR}/disk_test.tmp"
   local size_mb=100
   local read_speed write_speed
-  
+
   # Write test
   log_debug "Testing write speed..."
   local write_start write_end write_duration
   write_start=$(date +%s%N)
-  
+
   dd if=/dev/zero of="$test_file" bs=1M count=$size_mb conv=fsync 2>/dev/null || {
     log_error "Disk write benchmark failed"
     return 1
   }
-  
+
   write_end=$(date +%s%N)
-  write_duration=$(( (write_end - write_start) / 1000000 ))  # Milliseconds
-  write_speed=$(( size_mb * 1000 / write_duration ))         # MB/s
-  
+  write_duration=$(((write_end - write_start) / 1000000)) # Milliseconds
+  write_speed=$((size_mb * 1000 / write_duration))        # MB/s
+
   # Read test
   log_debug "Testing read speed..."
-  sync  # Clear cache
-  echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
-  
+  sync # Clear cache
+  echo 3 >/proc/sys/vm/drop_caches 2>/dev/null || true
+
   local read_start read_end read_duration
   read_start=$(date +%s%N)
-  
+
   dd if="$test_file" of=/dev/null bs=1M 2>/dev/null || {
     log_error "Disk read benchmark failed"
     rm -f "$test_file"
     return 1
   }
-  
+
   read_end=$(date +%s%N)
-  read_duration=$(( (read_end - read_start) / 1000000 ))
-  read_speed=$(( size_mb * 1000 / read_duration ))
-  
+  read_duration=$(((read_end - read_start) / 1000000))
+  read_speed=$((size_mb * 1000 / read_duration))
+
   # Cleanup
   rm -f "$test_file"
-  
+
   log_info "Disk I/O benchmark: Read=${read_speed}MB/s Write=${write_speed}MB/s"
   echo "$read_speed $write_speed"
 }
@@ -101,25 +101,25 @@ benchmark_disk_io() {
 # Returns: download_speed (in Mbps)
 benchmark_network() {
   log_info "Running network speed benchmark..."
-  
+
   # Test with a small Debian mirror file (10MB)
   local test_url="http://deb.debian.org/debian/README"
   local test_file="${BENCHMARK_DIR}/network_test.tmp"
   local start end duration speed_mbps
-  
+
   start=$(date +%s%N)
-  
+
   if wget -q -O "$test_file" "$test_url" --timeout=30 2>/dev/null; then
     end=$(date +%s%N)
-    duration=$(( (end - start) / 1000000 ))  # Milliseconds
-    
+    duration=$(((end - start) / 1000000)) # Milliseconds
+
     local file_size_kb
     file_size_kb=$(stat -f "%z" "$test_file" 2>/dev/null || stat -c "%s" "$test_file" 2>/dev/null || echo "0")
-    file_size_kb=$(( file_size_kb / 1024 ))  # Convert to KB
-    
+    file_size_kb=$((file_size_kb / 1024)) # Convert to KB
+
     # Calculate speed: (KB * 8) / (ms / 1000) = Kbps, then / 1024 = Mbps
-    speed_mbps=$(( (file_size_kb * 8 * 1000) / (duration * 1024) ))
-    
+    speed_mbps=$(((file_size_kb * 8 * 1000) / (duration * 1024)))
+
     rm -f "$test_file"
     log_info "Network benchmark: ${speed_mbps}Mbps"
     echo "$speed_mbps"
@@ -128,7 +128,7 @@ benchmark_network() {
     # Fallback: measure time to connect to debian.org
     local latency
     latency=$(ping -c 4 deb.debian.org 2>/dev/null | grep 'avg' | awk -F'/' '{print $5}' | cut -d'.' -f1)
-    
+
     if [[ -n "$latency" ]]; then
       log_info "Network latency: ${latency}ms"
       # Estimate speed based on latency (rough approximation)
@@ -151,20 +151,20 @@ benchmark_network() {
 benchmark_run_all() {
   log_info "Running comprehensive system benchmarks..."
   benchmark_init
-  
+
   local cpu_ops disk_read disk_write network_mbps
-  
+
   # Run benchmarks
   cpu_ops=$(benchmark_cpu)
-  read -r disk_read disk_write <<< "$(benchmark_disk_io)"
+  read -r disk_read disk_write <<<"$(benchmark_disk_io)"
   network_mbps=$(benchmark_network)
-  
+
   # Generate timestamp
   local timestamp
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  
+
   # Create JSON report
-  cat > "$BENCHMARK_RESULTS_FILE" <<EOF
+  cat >"$BENCHMARK_RESULTS_FILE" <<EOF
 {
   "timestamp": "$timestamp",
   "cpu": {
@@ -186,7 +186,7 @@ benchmark_run_all() {
   }
 }
 EOF
-  
+
   log_info "Benchmark results saved to: $BENCHMARK_RESULTS_FILE"
   cat "$BENCHMARK_RESULTS_FILE"
 }
@@ -196,31 +196,31 @@ EOF
 benchmark_compare() {
   local current_file="${1:-$BENCHMARK_RESULTS_FILE}"
   local baseline_file="${2:-${BENCHMARK_DIR}/baseline.json}"
-  
+
   if [[ ! -f "$current_file" ]]; then
     log_error "Current results file not found: $current_file"
     return 1
   fi
-  
+
   if [[ ! -f "$baseline_file" ]]; then
     log_warning "Baseline file not found: $baseline_file"
     log_info "Creating baseline from current results..."
     cp "$current_file" "$baseline_file"
     return 0
   fi
-  
+
   log_info "Comparing performance against baseline..."
-  
+
   # Extract values (requires jq or manual parsing)
   if command -v jq &>/dev/null; then
     local current_cpu baseline_cpu variance_cpu
     current_cpu=$(jq -r '.cpu.operations_per_second' "$current_file")
     baseline_cpu=$(jq -r '.cpu.operations_per_second' "$baseline_file")
     variance_cpu=$(echo "scale=2; (($current_cpu - $baseline_cpu) / $baseline_cpu) * 100" | bc)
-    
+
     log_info "CPU Performance: ${variance_cpu}% variance"
-    
-    if (( $(echo "$variance_cpu < -20" | bc -l) )); then
+
+    if (($(echo "$variance_cpu < -20" | bc -l))); then
       log_warning "CPU performance degraded by more than 20%"
     fi
   else

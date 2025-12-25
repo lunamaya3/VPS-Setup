@@ -25,26 +25,26 @@ fi
 transaction_init() {
   local log_dir
   log_dir=$(dirname "$TRANSACTION_LOG")
-  
+
   if [[ ! -d "$log_dir" ]]; then
     mkdir -p "$log_dir" || {
       log_error "Failed to create transaction log directory: $log_dir"
       return 1
     }
   fi
-  
+
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
     touch "$TRANSACTION_LOG" || {
       log_error "Failed to create transaction log: $TRANSACTION_LOG"
       return 1
     }
   fi
-  
+
   chmod 640 "$TRANSACTION_LOG" 2>/dev/null || true
-  
+
   log_debug "Transaction logging initialized"
   log_debug "Transaction log: $TRANSACTION_LOG"
-  
+
   return 0
 }
 
@@ -54,19 +54,19 @@ transaction_record() {
   local action="$1"
   local rollback_cmd="$2"
   local timestamp
-  
+
   if [[ -z "$action" ]] || [[ -z "$rollback_cmd" ]]; then
     log_error "Transaction record requires both action and rollback command"
     return 1
   fi
-  
+
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-  
+
   # Format: TIMESTAMP|ACTION|ROLLBACK_COMMAND
-  echo "${timestamp}|${action}|${rollback_cmd}" >> "$TRANSACTION_LOG"
-  
+  echo "${timestamp}|${action}|${rollback_cmd}" >>"$TRANSACTION_LOG"
+
   log_debug "Transaction recorded: $action"
-  
+
   return 0
 }
 
@@ -76,7 +76,7 @@ transaction_get_all_reverse() {
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
     return 0
   fi
-  
+
   tac "$TRANSACTION_LOG"
 }
 
@@ -86,8 +86,8 @@ transaction_count() {
     echo "0"
     return 0
   fi
-  
-  wc -l < "$TRANSACTION_LOG"
+
+  wc -l <"$TRANSACTION_LOG"
 }
 
 # Parse transaction record
@@ -98,9 +98,9 @@ transaction_parse() {
   local timestamp
   local action
   local rollback_cmd
-  
-  IFS='|' read -r timestamp action rollback_cmd <<< "$line"
-  
+
+  IFS='|' read -r timestamp action rollback_cmd <<<"$line"
+
   echo "$timestamp"
   echo "$action"
   echo "$rollback_cmd"
@@ -112,15 +112,16 @@ transaction_get_rollback_commands() {
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
     return 0
   fi
-  
+
   # Read transactions in reverse order and extract rollback commands
-  tac "$TRANSACTION_LOG" | cut -d'|' -f3
+  # Use -f3- to get field 3 and all subsequent fields (handles pipes in commands)
+  tac "$TRANSACTION_LOG" | cut -d'|' -f3-
 }
 
 # Clear transaction log
 transaction_clear() {
   if [[ -f "$TRANSACTION_LOG" ]]; then
-: > "$TRANSACTION_LOG"
+    : >"$TRANSACTION_LOG"
     log_info "Transaction log cleared"
   fi
 }
@@ -129,17 +130,17 @@ transaction_clear() {
 # Args: $1 - backup file path (optional)
 transaction_backup() {
   local backup_file="${1:-${TRANSACTION_LOG}.backup}"
-  
+
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
     log_warning "Transaction log not found, cannot backup"
     return 1
   fi
-  
+
   cp "$TRANSACTION_LOG" "$backup_file" || {
     log_error "Failed to backup transaction log"
     return 1
   }
-  
+
   log_info "Transaction log backed up to: $backup_file"
   return 0
 }
@@ -148,13 +149,13 @@ transaction_backup() {
 transaction_show_summary() {
   local count
   count=$(transaction_count)
-  
+
   log_info "Transaction Summary:"
   log_info "  Total transactions: $count"
-  
+
   if [[ $count -gt 0 ]]; then
     log_info "  Recent transactions:"
-    
+
     # Show last 5 transactions
     tail -n 5 "$TRANSACTION_LOG" | while IFS='|' read -r timestamp action rollback_cmd; do
       log_info "    [$timestamp] $action"
@@ -221,8 +222,8 @@ transaction_log() {
     # format: transaction_log "rollback_cmd"
     transaction_record "System Action" "$1"
   elif [[ $# -eq 2 ]]; then
-     # format: transaction_log "action" "rollback_cmd"
-     transaction_record "$1" "$2"
+    # format: transaction_log "action" "rollback_cmd"
+    transaction_record "$1" "$2"
   elif [[ $# -ge 3 ]]; then
     # format: transaction_log "type" "subject" "rollback"
     transaction_record "$1: $2" "$3"
@@ -237,28 +238,28 @@ transaction_validate() {
     log_warning "Transaction log not found"
     return 1
   fi
-  
+
   local line_num=0
   local errors=0
-  
+
   while IFS= read -r line; do
     line_num=$((line_num + 1))
-    
+
     # Check format: should have 3 fields separated by |
     local field_count
     field_count=$(echo "$line" | awk -F'|' '{print NF}')
-    
+
     if [[ $field_count -ne 3 ]]; then
       log_error "Transaction log format error at line $line_num"
       errors=$((errors + 1))
     fi
-  done < "$TRANSACTION_LOG"
-  
+  done <"$TRANSACTION_LOG"
+
   if [[ $errors -gt 0 ]]; then
     log_error "Transaction log validation failed with $errors error(s)"
     return 1
   fi
-  
+
   log_debug "Transaction log validation passed"
   return 0
 }
@@ -266,17 +267,17 @@ transaction_validate() {
 # Restore transaction log from backup
 transaction_restore() {
   local backup_file="${1}"
-  
+
   if [[ ! -f "${backup_file}" ]]; then
     log_error "Backup file not found: ${backup_file}"
     return 1
   fi
-  
+
   cp "${backup_file}" "${TRANSACTION_LOG}" || {
     log_error "Failed to restore transaction log from backup"
     return 1
   }
-  
+
   log_info "Transaction log restored from: ${backup_file}"
   return 0
 }
@@ -286,7 +287,7 @@ transaction_get_last() {
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
     return 0
   fi
-  
+
   tail -n 1 "$TRANSACTION_LOG"
 }
 
@@ -295,18 +296,18 @@ transaction_get_first() {
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
     return 0
   fi
-  
+
   head -n 1 "$TRANSACTION_LOG"
 }
 
 # Filter transactions by pattern
 transaction_filter_by_pattern() {
   local pattern="${1}"
-  
+
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
     return 0
   fi
-  
+
   grep "${pattern}" "$TRANSACTION_LOG" || true
 }
 
@@ -316,7 +317,7 @@ transaction_export_json() {
     echo "[]"
     return 0
   fi
-  
+
   echo "["
   local first=true
   while IFS='|' read -r timestamp action rollback_cmd; do
@@ -325,13 +326,13 @@ transaction_export_json() {
     else
       echo ","
     fi
-    
+
     # Escape quotes in values using jq for robust JSON encoding
     local ts_json action_json rollback_json
     ts_json=$(printf '%s' "$timestamp" | jq -Rs .)
     action_json=$(printf '%s' "$action" | jq -Rs .)
     rollback_json=$(printf '%s' "$rollback_cmd" | jq -Rs .)
-    
+
     cat <<EOF
   {
     "timestamp": $ts_json,
@@ -339,7 +340,7 @@ transaction_export_json() {
     "rollback_command": $rollback_json
   }
 EOF
-  done < "$TRANSACTION_LOG"
+  done <"$TRANSACTION_LOG"
   echo ""
   echo "]"
 }
@@ -347,11 +348,11 @@ EOF
 # Get transaction by index (1-indexed)
 transaction_get_by_index() {
   local index="${1}"
-  
+
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
     return 1
   fi
-  
+
   sed -n "${index}p" "$TRANSACTION_LOG"
 }
 
@@ -359,7 +360,7 @@ transaction_get_by_index() {
 transaction_summarize() {
   local count
   count=$(transaction_count)
-  
+
   cat <<EOF
 Transaction Log Summary:
   Total Transactions: ${count}

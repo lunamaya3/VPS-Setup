@@ -20,14 +20,13 @@ Checks:
     - Terminal configuration
 """
 
-import subprocess
-import sys
-import json
 import argparse
+import json
 import os
 import socket
-from typing import Dict, List, Tuple, Optional, Any
-from pathlib import Path
+import subprocess
+import sys
+from typing import Any, Dict, List, Tuple
 
 
 class HealthCheck:
@@ -64,7 +63,7 @@ class HealthCheck:
 
         try:
             # Check /etc/os-release
-            with open("/etc/os-release", "r") as f:
+            with open("/etc/os-release", "r", encoding="utf-8") as f:
                 os_info = {}
                 for line in f:
                     if "=" in line:
@@ -105,7 +104,7 @@ class HealthCheck:
 
         try:
             # Check RAM
-            with open("/proc/meminfo", "r") as f:
+            with open("/proc/meminfo", "r", encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("MemTotal:"):
                         mem_kb = int(line.split()[1])
@@ -165,9 +164,7 @@ class HealthCheck:
             "details": {},
         }
 
-        success, stdout, stderr = self.run_command(
-            ["systemctl", "is-active", service_name]
-        )
+        success, stdout, _ = self.run_command(["systemctl", "is-active", service_name])
 
         if success and "active" in stdout:
             check["status"] = "pass"
@@ -225,7 +222,7 @@ class HealthCheck:
             "details": {"command": command},
         }
 
-        success, stdout, stderr = self.run_command(["which", command])
+        success, stdout, _ = self.run_command(["which", command])
 
         if success and stdout.strip():
             exe_path = stdout.strip()

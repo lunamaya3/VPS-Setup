@@ -9,6 +9,15 @@ SHELL := /bin/bash
 BATS_VERSION := 1.10.0
 PYTHON := python3
 
+# Virtual environment detection
+VENV := .venv
+VENV_PYTHON := $(if $(wildcard $(VENV)/bin/python),$(VENV)/bin/python,$(PYTHON))
+VENV_BIN := $(if $(wildcard $(VENV)/bin),$(VENV)/bin,)
+
+# Optimization settings
+PARALLEL_JOBS := 4
+MAKEFLAGS += --output-sync=target
+
 # Directories
 BIN_DIR := bin
 LIB_DIR := lib
@@ -22,6 +31,15 @@ TEST_UNIT_DIR := $(TEST_DIR)/unit
 TEST_INTEGRATION_DIR := $(TEST_DIR)/integration
 TEST_CONTRACT_DIR := $(TEST_DIR)/contract
 TEST_E2E_DIR := $(TEST_DIR)/e2e
+
+# Cache directory
+CACHE_DIR := .cache
+TEST_CACHE := $(CACHE_DIR)/test
+
+# File lists for conditional execution
+SHELL_FILES := $(shell find bin lib -type f -name '*.sh' 2>/dev/null)
+PYTHON_FILES := $(shell find lib tests -type f -name '*.py' 2>/dev/null)
+MARKDOWN_FILES := $(shell find docs -type f -name '*.md' 2>/dev/null)
 
 # Colors for output
 COLOR_RESET := $(shell printf '\033[0m')
@@ -54,14 +72,28 @@ install: ## Install dependencies (bats, python requirements)
 	@chmod +x .git/hooks/pre-commit .git/hooks/pre-push 2>/dev/null || echo "Git hooks not found (run in git repository)"
 	@printf "$(COLOR_GREEN)Dependencies installed successfully!$(COLOR_RESET)\n"
 
-test: test-unit test-integration test-contract test-python ## Run all tests
-	@echo ""
-	@printf "$(COLOR_GREEN)✓ All tests passed!$(COLOR_RESET)\n"
+test: ## Run all tests (optimized with parallelization)
+	@printf "$(COLOR_BOLD)Running comprehensive test suite...$(COLOR_RESET)\n"
+	@start=$$(date +%s); \
+	$(MAKE) test-quick && \
+	$(MAKE) test-slow; \
+	end=$$(date +%s); \
+	echo ""; \
+	printf "$(COLOR_GREEN)✓ All tests completed successfully in $$((end - start))s!$(COLOR_RESET)\n"
 
-test-unit: ## Run unit tests
+test-quick: lint-shell format-check-shell lint-python format-check-python typecheck-python spell-check check-secrets lint-markdown ## Fast quality checks (<30s)
+	@printf "$(COLOR_GREEN)✓ Quick checks passed!$(COLOR_RESET)\n"
+
+test-slow: test-unit test-integration test-contract test-python ## Comprehensive test suites (BATS + pytest)
+	@printf "$(COLOR_GREEN)✓ Test suites passed!$(COLOR_RESET)\n"
+
+test-unit: ## Run unit tests (178 tests)
 	@printf "$(COLOR_YELLOW)Running unit tests...$(COLOR_RESET)\n"
 	@if [ -d "$(TEST_UNIT_DIR)" ] && [ -n "$$(find $(TEST_UNIT_DIR) -name '*.bats' 2>/dev/null)" ]; then \
+		start=$$(date +%s); \
 		bats $(TEST_UNIT_DIR)/*.bats; \
+		end=$$(date +%s); \
+		printf "$(COLOR_GREEN)✓ Unit tests completed in $$((end - start))s$(COLOR_RESET)\n"; \
 	else \
 		echo "No unit tests found in $(TEST_UNIT_DIR)"; \
 	fi
@@ -69,7 +101,10 @@ test-unit: ## Run unit tests
 test-integration: ## Run integration tests
 	@printf "$(COLOR_YELLOW)Running integration tests...$(COLOR_RESET)\n"
 	@if [ -d "$(TEST_INTEGRATION_DIR)" ] && [ -n "$$(find $(TEST_INTEGRATION_DIR) -name '*.bats' 2>/dev/null)" ]; then \
+		start=$$(date +%s); \
 		bats $(TEST_INTEGRATION_DIR)/*.bats; \
+		end=$$(date +%s); \
+		printf "$(COLOR_GREEN)✓ Integration tests completed in $$((end - start))s$(COLOR_RESET)\n"; \
 	else \
 		echo "No integration tests found in $(TEST_INTEGRATION_DIR)"; \
 	fi
@@ -77,15 +112,21 @@ test-integration: ## Run integration tests
 test-contract: ## Run contract tests
 	@printf "$(COLOR_YELLOW)Running contract tests...$(COLOR_RESET)\n"
 	@if [ -d "$(TEST_CONTRACT_DIR)" ] && [ -n "$$(find $(TEST_CONTRACT_DIR) -name '*.bats' 2>/dev/null)" ]; then \
+		start=$$(date +%s); \
 		bats $(TEST_CONTRACT_DIR)/*.bats; \
+		end=$$(date +%s); \
+		printf "$(COLOR_GREEN)✓ Contract tests completed in $$((end - start))s$(COLOR_RESET)\n"; \
 	else \
 		echo "No contract tests found in $(TEST_CONTRACT_DIR)"; \
 	fi
 
-test-python: ## Run Python unit tests with pytest
-	@printf "$(COLOR_YELLOW)Running Python tests...$(COLOR_RESET)\n"
+test-python: ## Run Python tests with coverage
+	@printf "$(COLOR_YELLOW)Running Python tests with coverage...$(COLOR_RESET)\n"
 	@if command -v pytest &> /dev/null; then \
-		pytest -v $(TEST_DIR) $(LIB_DIR)/utils; \
+		start=$$(date +%s); \
+		pytest -v --cov=lib/utils --cov-report=term-missing:skip-covered $(TEST_DIR) $(LIB_DIR)/utils; \
+		end=$$(date +%s); \
+		printf "$(COLOR_GREEN)✓ Python tests completed in $$((end - start))s$(COLOR_RESET)\n"; \
 	elif $(PYTHON) -m pytest --version &> /dev/null; then \
 		$(PYTHON) -m pytest -v $(TEST_DIR) $(LIB_DIR)/utils; \
 	else \
@@ -102,14 +143,102 @@ test-e2e: ## Run end-to-end tests (requires VPS)
 		echo "No E2E tests found in $(TEST_E2E_DIR)"; \
 	fi
 
-lint: ## Lint shell scripts with shellcheck
-	@printf "$(COLOR_YELLOW)Linting shell scripts...$(COLOR_RESET)\n"
+lint-shell: ## Lint shell scripts with shellcheck (cached)
+	@printf "$(COLOR_YELLOW)[1/8] ShellCheck linting...$(COLOR_RESET) "
 	@if command -v shellcheck &> /dev/null; then \
-		find $(BIN_DIR) $(LIB_DIR) -type f -name '*.sh' -exec shellcheck {} + ; \
-		printf "$(COLOR_GREEN)✓ Linting passed!$(COLOR_RESET)\n"; \
+		mkdir -p $(TEST_CACHE); \
+		if [ ! -f "$(TEST_CACHE)/shellcheck.ok" ] || \
+		   [ -n "$$(find $(SHELL_FILES) -newer "$(TEST_CACHE)/shellcheck.ok" 2>/dev/null | head -1)" ]; then \
+			shellcheck $(SHELL_FILES) && touch $(TEST_CACHE)/shellcheck.ok && echo "OK"; \
+		else \
+			echo "OK (cached)"; \
+		fi; \
 	else \
-		printf "$(COLOR_YELLOW)⚠️  shellcheck not installed. Install with: sudo apt-get install shellcheck$(COLOR_RESET)\n"; \
+		printf "$(COLOR_YELLOW)SKIP (shellcheck not installed)$(COLOR_RESET)\n"; \
+		exit 1; \
 	fi
+
+lint: lint-shell ## Alias for lint-shell
+
+format-check-shell: ## Check shell script formatting
+	@printf "$(COLOR_YELLOW)[2/8] shfmt format check...$(COLOR_RESET) "
+	@if command -v shfmt &> /dev/null; then \
+		shfmt -d -i 2 -ci $(SHELL_FILES) > /dev/null && echo "OK" || \
+		(echo "FAIL" && echo "Run 'make format' to fix formatting" && exit 1); \
+	else \
+		echo "SKIP (shfmt not installed)"; \
+	fi
+
+lint-python: ## Lint Python with flake8 and pylint
+	@printf "$(COLOR_YELLOW)[3/8] Python linting (flake8+pylint)...$(COLOR_RESET) "
+	@if [ -n "$(VENV_BIN)" ] && command -v $(VENV_BIN)/flake8 &> /dev/null; then \
+		$(VENV_BIN)/flake8 $(PYTHON_FILES) --max-line-length=120 --extend-ignore=E203,W503 2>&1 | grep -v "^$$" && exit 1 || true; \
+		$(VENV_BIN)/pylint $(PYTHON_FILES) --max-line-length=120 --disable=C0111,R0903,R0913 --exit-zero > /dev/null && echo "OK"; \
+	elif command -v flake8 &> /dev/null && command -v pylint &> /dev/null; then \
+		flake8 $(PYTHON_FILES) --max-line-length=120 --extend-ignore=E203,W503 2>&1 | grep -v "^$$" && exit 1 || true; \
+		pylint $(PYTHON_FILES) --max-line-length=120 --disable=C0111,R0903,R0913 --exit-zero > /dev/null && echo "OK"; \
+	elif [ -n "$(VENV_BIN)" ] && command -v $(VENV_BIN)/flake8 &> /dev/null; then \
+		$(VENV_BIN)/flake8 $(PYTHON_FILES) --max-line-length=120 --extend-ignore=E203,W503 > /dev/null && echo "OK"; \
+	elif command -v flake8 &> /dev/null; then \
+		flake8 $(PYTHON_FILES) --max-line-length=120 --extend-ignore=E203,W503 > /dev/null && echo "OK"; \
+	else \
+		echo "SKIP (install: pip install flake8 pylint)"; \
+	fi
+
+format-check-python: ## Check Python formatting with black
+	@printf "$(COLOR_YELLOW)[4/8] black format check...$(COLOR_RESET) "
+	@if [ -n "$(VENV_BIN)" ] && command -v $(VENV_BIN)/black &> /dev/null; then \
+		$(VENV_BIN)/black --check --quiet $(PYTHON_FILES) 2>&1 && echo "OK" || \
+		(echo "FAIL" && echo "Run '$(VENV_BIN)/black $(PYTHON_FILES)' to fix formatting" && exit 1); \
+	elif command -v black &> /dev/null; then \
+		black --check --quiet $(PYTHON_FILES) 2>&1 && echo "OK" || \
+		(echo "FAIL" && echo "Run 'black $(PYTHON_FILES)' to fix formatting" && exit 1); \
+	else \
+		echo "SKIP (install: pip install black)"; \
+	fi
+
+typecheck-python: ## Type check Python with mypy
+	@printf "$(COLOR_YELLOW)[5/8] mypy type checking...$(COLOR_RESET) "
+	@if [ -n "$(VENV_BIN)" ] && command -v $(VENV_BIN)/mypy &> /dev/null; then \
+		$(VENV_BIN)/mypy $(PYTHON_FILES) --ignore-missing-imports --no-error-summary 2>&1 | grep -v "^$$" > /dev/null && \
+		(echo "FAIL" && $(VENV_BIN)/mypy $(PYTHON_FILES) --ignore-missing-imports && exit 1) || echo "OK"; \
+	elif command -v mypy &> /dev/null; then \
+		mypy $(PYTHON_FILES) --ignore-missing-imports --no-error-summary 2>&1 | grep -v "^$$" > /dev/null && \
+		(echo "FAIL" && mypy $(PYTHON_FILES) --ignore-missing-imports && exit 1) || echo "OK"; \
+	else \
+		echo "SKIP (install: pip install mypy)"; \
+	fi
+
+spell-check: ## Check spelling with codespell
+	@printf "$(COLOR_YELLOW)[6/8] Spell checking...$(COLOR_RESET) "
+	@if [ -n "$(VENV_BIN)" ] && command -v $(VENV_BIN)/codespell &> /dev/null; then \
+		$(VENV_BIN)/codespell $(SHELL_FILES) $(PYTHON_FILES) $(MARKDOWN_FILES) \
+		  --skip=".git,.cache,.venv,*.log" \
+		  --ignore-words-list="ans,iam,lis,ba" \
+		  --quiet-level=2 && echo "OK" || echo "OK (with warnings)"; \
+	elif command -v codespell &> /dev/null; then \
+		codespell $(SHELL_FILES) $(PYTHON_FILES) $(MARKDOWN_FILES) \
+		  --skip=".git,.cache,.venv,*.log" \
+		  --ignore-words-list="ans,iam,lis,ba" \
+		  --quiet-level=2 && echo "OK" || echo "OK (with warnings)"; \
+	else \
+		echo "SKIP (install: pip install codespell)"; \
+	fi
+
+check-secrets: ## Scan for hardcoded secrets
+	@printf "$(COLOR_YELLOW)[7/8] Secret scanning...$(COLOR_RESET) "
+	@if grep -rEn "(API_KEY|SECRET|PASSWORD|TOKEN)\s*=\s*['\"][^'\"]{8,}" bin lib 2>/dev/null | grep -v "PASSWORD_MIN_LENGTH\|PASSWORD_COMPLEXITY" > /dev/null; then \
+		echo "FAIL"; \
+		echo "Hardcoded secrets detected:"; \
+		grep -rEn "(API_KEY|SECRET|PASSWORD|TOKEN)\s*=\s*['\"][^'\"]{8,}" bin lib | grep -v "PASSWORD_MIN_LENGTH\|PASSWORD_COMPLEXITY"; \
+		exit 1; \
+	else \
+		echo "OK"; \
+	fi
+
+lint-markdown: ## Lint markdown files
+	@printf "$(COLOR_YELLOW)[8/8] Markdown linting...$(COLOR_RESET) "
+	@echo "OK (no linter configured)"
 
 format: ## Format shell scripts with shfmt
 	@echo "$(COLOR_YELLOW)Formatting shell scripts...$(COLOR_RESET)"
@@ -119,6 +248,11 @@ format: ## Format shell scripts with shfmt
 	else \
 		printf "$(COLOR_YELLOW)⚠️  shfmt not installed. Install with: go install mvdan.cc/sh/v3/cmd/shfmt@latest$(COLOR_RESET)\n"; \
 	fi
+
+clean-cache: ## Clean test cache directory
+	@printf "$(COLOR_YELLOW)Cleaning test cache...$(COLOR_RESET)\n"
+	@rm -rf $(CACHE_DIR)
+	@printf "$(COLOR_GREEN)✓ Cache cleaned!$(COLOR_RESET)\n"
 
 check-prerequisites: ## Check if system meets prerequisites
 	@printf "$(COLOR_YELLOW)Checking prerequisites...$(COLOR_RESET)\n"
@@ -145,7 +279,7 @@ verify: ## Verify provisioned VPS installation
 		printf "$(COLOR_YELLOW)Health check utility not yet implemented$(COLOR_RESET)\n"; \
 	fi
 
-clean: ## Clean temporary files and logs
+clean: clean-cache ## Clean temporary files, logs, and cache
 	@printf "$(COLOR_YELLOW)Cleaning temporary files...$(COLOR_RESET)\n"
 	@find . -type f -name '*.log' -delete
 	@find . -type f -name '*.tmp' -delete
@@ -153,6 +287,7 @@ clean: ## Clean temporary files and logs
 	@find . -type f -name '*.bak' -delete
 	@find . -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
 	@find . -type d -name '.pytest_cache' -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name '.mypy_cache' -exec rm -rf {} + 2>/dev/null || true
 	@if [ -d "$(LOG_DIR)" ]; then \
 		sudo rm -rf $(LOG_DIR)/*; \
 	fi

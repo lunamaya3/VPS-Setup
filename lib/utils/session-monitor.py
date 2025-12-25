@@ -20,7 +20,7 @@ import argparse
 import json
 import subprocess
 import sys
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 
 class SessionMonitor:
@@ -31,7 +31,9 @@ class SessionMonitor:
     MAX_MEMORY_MB = 4096  # 4GB total system RAM
     TARGET_BUFFER_MB = 1024  # 1GB buffer for system
     TARGET_SESSIONS = 3
-    EXPECTED_PER_SESSION_MB = (MAX_MEMORY_MB - TARGET_BUFFER_MB) / TARGET_SESSIONS  # ~1024MB
+    EXPECTED_PER_SESSION_MB = (
+        MAX_MEMORY_MB - TARGET_BUFFER_MB
+    ) / TARGET_SESSIONS  # ~1024MB
 
     def __init__(self):
         self.sessions: List[Dict] = []
@@ -52,7 +54,7 @@ class SessionMonitor:
 
             for line in result.stdout.splitlines():
                 # Look for Xorg processes spawned by xrdp (display :10, :11, :12, etc.)
-                if 'Xorg' in line and ':1' in line:
+                if "Xorg" in line and ":1" in line:
                     parts = line.split()
                     if len(parts) < 11:
                         continue
@@ -64,7 +66,7 @@ class SessionMonitor:
                     # Extract display number from command
                     display = None
                     for part in parts[10:]:
-                        if part.startswith(':') and part[1:].isdigit():
+                        if part.startswith(":") and part[1:].isdigit():
                             display = part
                             break
 
@@ -75,13 +77,15 @@ class SessionMonitor:
                     # mem_percent is % of total system RAM
                     memory_mb = (mem_percent / 100.0) * self.MAX_MEMORY_MB
 
-                    sessions.append({
-                        'display': display,
-                        'user': user,
-                        'pid': int(pid),
-                        'memory_mb': round(memory_mb, 2),
-                        'memory_percent': mem_percent
-                    })
+                    sessions.append(
+                        {
+                            "display": display,
+                            "user": user,
+                            "pid": int(pid),
+                            "memory_mb": round(memory_mb, 2),
+                            "memory_percent": mem_percent,
+                        }
+                    )
 
             return sessions
 
@@ -110,10 +114,10 @@ class SessionMonitor:
                 return {}
 
             return {
-                'total_mb': float(mem_line[1]),
-                'used_mb': float(mem_line[2]),
-                'free_mb': float(mem_line[3]),
-                'available_mb': float(mem_line[6])
+                "total_mb": float(mem_line[1]),
+                "used_mb": float(mem_line[2]),
+                "free_mb": float(mem_line[3]),
+                "available_mb": float(mem_line[6]),
             }
 
         except (subprocess.CalledProcessError, ValueError, IndexError) as e:
@@ -135,19 +139,27 @@ class SessionMonitor:
             return False
 
         # Check overall system memory usage
-        used_percent = (system_mem['used_mb'] / system_mem['total_mb']) * 100
+        used_percent = (system_mem["used_mb"] / system_mem["total_mb"]) * 100
         if used_percent > threshold_percent:
-            print(f"WARNING: System memory usage {used_percent:.1f}% exceeds threshold {threshold_percent}%",
-                  file=sys.stderr)
+            print(
+                f"WARNING: System memory usage {used_percent:.1f}% "
+                f"exceeds threshold {threshold_percent}%",
+                file=sys.stderr,
+            )
             return False
 
         # Check per-session memory usage
         sessions = self.get_active_sessions()
         for session in sessions:
-            if session['memory_mb'] > self.EXPECTED_PER_SESSION_MB * 1.5:  # 50% over expected
-                print(f"WARNING: Session {session['display']} using {session['memory_mb']}MB "
-                      f"(expected ~{self.EXPECTED_PER_SESSION_MB:.0f}MB)",
-                      file=sys.stderr)
+            if (
+                session["memory_mb"] > self.EXPECTED_PER_SESSION_MB * 1.5
+            ):  # 50% over expected
+                expected_mb = self.EXPECTED_PER_SESSION_MB
+                print(
+                    f"WARNING: Session {session['display']} using {session['memory_mb']}MB "
+                    f"(expected ~{expected_mb:.0f}MB)",
+                    file=sys.stderr,
+                )
                 return False
 
         return True
@@ -169,15 +181,15 @@ class SessionMonitor:
 
         if output_json:
             report = {
-                'system_memory': system_mem,
-                'active_sessions': sessions,
-                'session_count': len(sessions),
-                'thresholds_ok': thresholds_ok,
-                'targets': {
-                    'max_sessions': self.TARGET_SESSIONS,
-                    'expected_per_session_mb': round(self.EXPECTED_PER_SESSION_MB, 2),
-                    'buffer_mb': self.TARGET_BUFFER_MB
-                }
+                "system_memory": system_mem,
+                "active_sessions": sessions,
+                "session_count": len(sessions),
+                "thresholds_ok": thresholds_ok,
+                "targets": {
+                    "max_sessions": self.TARGET_SESSIONS,
+                    "expected_per_session_mb": round(self.EXPECTED_PER_SESSION_MB, 2),
+                    "buffer_mb": self.TARGET_BUFFER_MB,
+                },
             }
             return json.dumps(report, indent=2)
 
@@ -190,10 +202,12 @@ class SessionMonitor:
 
         # System memory
         if system_mem:
-            used_pct = (system_mem['used_mb'] / system_mem['total_mb']) * 100
-            lines.append(f"System Memory:")
+            used_pct = (system_mem["used_mb"] / system_mem["total_mb"]) * 100
+            lines.append("System Memory:")
             lines.append(f"  Total:     {system_mem['total_mb']:.0f} MB")
-            lines.append(f"  Used:      {system_mem['used_mb']:.0f} MB ({used_pct:.1f}%)")
+            lines.append(
+                f"  Used:      {system_mem['used_mb']:.0f} MB ({used_pct:.1f}%)"
+            )
             lines.append(f"  Available: {system_mem['available_mb']:.0f} MB")
             lines.append("")
 
@@ -201,7 +215,9 @@ class SessionMonitor:
         lines.append(f"Active RDP Sessions: {len(sessions)}")
         if sessions:
             lines.append("")
-            lines.append(f"{'Display':<10} {'User':<15} {'PID':<8} {'Memory (MB)':<12} {'% RAM':<8}")
+            lines.append(
+                f"{'Display':<10} {'User':<15} {'PID':<8} {'Memory (MB)':<12} {'% RAM':<8}"
+            )
             lines.append("-" * 70)
             for session in sessions:
                 lines.append(
@@ -216,7 +232,9 @@ class SessionMonitor:
         # Performance targets
         lines.append("Performance Targets (NFR-004):")
         lines.append(f"  Max Concurrent Sessions: {self.TARGET_SESSIONS}")
-        lines.append(f"  Expected per Session:    ~{self.EXPECTED_PER_SESSION_MB:.0f} MB")
+        lines.append(
+            f"  Expected per Session:    ~{self.EXPECTED_PER_SESSION_MB:.0f} MB"
+        )
         lines.append(f"  System Buffer:           {self.TARGET_BUFFER_MB} MB")
         lines.append("")
 
@@ -233,28 +251,19 @@ class SessionMonitor:
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(
-        description="Monitor RDP session resource usage"
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output in JSON format"
-    )
+    parser = argparse.ArgumentParser(description="Monitor RDP session resource usage")
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
     parser.add_argument(
         "--threshold",
         type=int,
         default=75,
-        help="Memory threshold percentage for warnings (default: 75)"
+        help="Memory threshold percentage for warnings (default: 75)",
     )
 
     args = parser.parse_args()
 
     monitor = SessionMonitor()
-    report = monitor.generate_report(
-        output_json=args.json,
-        threshold=args.threshold
-    )
+    report = monitor.generate_report(output_json=args.json, threshold=args.threshold)
 
     print(report)
 

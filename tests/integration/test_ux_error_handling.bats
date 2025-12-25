@@ -304,7 +304,8 @@ teardown() {
 
 # Integration tests combining multiple features
 @test "Integration: Error classification and formatting work together" {
-  local stderr="connection timeout"
+  # Use a pure network error (not timeout) for this test
+  local stderr="connection refused"
   local error_type
   error_type=$(error_classify 100 "$stderr" "")
   

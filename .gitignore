@@ -24,6 +24,7 @@ __pycache__/
 .mypy_cache/
 .dmypy.json
 dmypy.json
+.cache/
 
 # Temporary files
 tmp/

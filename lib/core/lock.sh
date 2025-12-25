@@ -28,7 +28,7 @@ source "${SCRIPT_DIR}/logger.sh"
 readonly LOCK_FILE="${LOCK_FILE:-/var/lock/vps-provision.lock}"
 LOCK_DIR=$(dirname "$LOCK_FILE")
 readonly LOCK_DIR
-readonly LOCK_TIMEOUT="${LOCK_TIMEOUT:-300}"  # 5 minutes
+readonly LOCK_TIMEOUT="${LOCK_TIMEOUT:-300}" # 5 minutes
 
 # Current lock state
 LOCK_HELD=false
@@ -41,7 +41,7 @@ lock_init() {
       return 1
     }
   fi
-  
+
   log_debug "Lock system initialized"
   log_debug "Lock file: $LOCK_FILE"
 }
@@ -51,20 +51,20 @@ lock_init() {
 # Returns: 0 if stale, 1 if active
 lock_is_stale() {
   local pid="$1"
-  
+
   if [[ -z "$pid" ]] || [[ ! "$pid" =~ ^[0-9]+$ ]]; then
     log_debug "Invalid PID in lock file: $pid"
-    return 0  # Stale (invalid PID)
+    return 0 # Stale (invalid PID)
   fi
-  
+
   # Check if process exists
   if kill -0 "$pid" 2>/dev/null; then
     log_debug "Process $pid is still running"
-    return 1  # Not stale (process exists)
+    return 1 # Not stale (process exists)
   fi
-  
+
   log_debug "Process $pid not found (stale lock)"
-  return 0  # Stale (process doesn't exist)
+  return 0 # Stale (process doesn't exist)
 }
 
 # Check lock file age
@@ -74,15 +74,15 @@ lock_get_age() {
     echo "0"
     return 0
   fi
-  
+
   local current_time
   current_time=$(date +%s)
-  
+
   local file_time
   file_time=$(stat -c %Y "$LOCK_FILE" 2>/dev/null || echo "0")
-  
+
   local age=$((current_time - file_time))
-  
+
   echo "$age"
 }
 
@@ -92,57 +92,57 @@ lock_get_age() {
 lock_acquire() {
   local max_wait="${1:-0}"
   local waited=0
-  
+
   log_debug "Attempting to acquire lock..."
-  
+
   # Ensure lock directory exists
   lock_init || return 1
-  
+
   while true; do
     if [[ ! -f "$LOCK_FILE" ]]; then
       # No lock file, create it
-      echo "$$" > "$LOCK_FILE" || {
+      echo "$$" >"$LOCK_FILE" || {
         log_error "Failed to create lock file: $LOCK_FILE"
         return 1
       }
-      
+
       LOCK_HELD=true
       log_info "Lock acquired (PID: $$)"
       return 0
     fi
-    
+
     # Lock file exists, check if stale
     local lock_pid
     lock_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-    
+
     if lock_is_stale "$lock_pid"; then
       local age
       age=$(lock_get_age)
       log_warning "Stale lock file detected (PID: $lock_pid, age: ${age}s)"
-      
+
       # Remove stale lock
       rm -f "$LOCK_FILE" || {
         log_error "Failed to remove stale lock file"
         return 1
       }
-      
+
       log_info "Removed stale lock file"
-      continue  # Try to acquire again
+      continue # Try to acquire again
     fi
-    
+
     # Lock is held by active process
     if [[ $max_wait -eq 0 ]]; then
       log_error "Lock is held by another process (PID: $lock_pid)"
       log_error "Wait for process to complete or use --force to override"
       return 1
     fi
-    
+
     # Wait and retry
     if [[ $waited -ge $max_wait ]]; then
       log_error "Timeout waiting for lock (waited ${waited}s)"
       return 1
     fi
-    
+
     log_info "Lock held by PID $lock_pid, waiting... (${waited}/${max_wait}s)"
     sleep 2
     waited=$((waited + 2))
@@ -156,27 +156,27 @@ lock_release() {
     log_debug "No lock to release"
     return 0
   fi
-  
+
   if [[ ! -f "$LOCK_FILE" ]]; then
     log_warning "Lock file does not exist (already released?)"
     LOCK_HELD=false
     return 0
   fi
-  
+
   local lock_pid
   lock_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-  
+
   if [[ "$lock_pid" != "$$" ]]; then
     log_warning "Lock file PID ($lock_pid) doesn't match current process ($$)"
     log_warning "Not releasing lock (may be owned by another process)"
     return 1
   fi
-  
+
   rm -f "$LOCK_FILE" || {
     log_error "Failed to remove lock file: $LOCK_FILE"
     return 1
   }
-  
+
   LOCK_HELD=false
   log_info "Lock released"
   return 0
@@ -189,17 +189,17 @@ lock_force_release() {
     log_info "No lock file to force release"
     return 0
   fi
-  
+
   local lock_pid
   lock_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "unknown")
-  
+
   log_warning "Force releasing lock (owner PID: $lock_pid)"
-  
+
   rm -f "$LOCK_FILE" || {
     log_error "Failed to force release lock file"
     return 1
   }
-  
+
   LOCK_HELD=false
   log_info "Lock force released"
   return 0
@@ -220,7 +220,7 @@ lock_get_owner() {
     echo ""
     return 0
   fi
-  
+
   cat "$LOCK_FILE" 2>/dev/null || echo ""
 }
 
@@ -238,30 +238,30 @@ lock_cleanup_on_exit() {
 lock_wait() {
   local max_wait="${1:-60}"
   local waited=0
-  
+
   log_info "Waiting for lock to become available..."
-  
+
   while [[ -f "$LOCK_FILE" ]]; do
     local lock_pid
     lock_pid=$(cat "$LOCK_FILE" 2>/dev/null || echo "")
-    
+
     # Check if lock is stale
     if lock_is_stale "$lock_pid"; then
       log_info "Lock is stale, will be removed"
       return 0
     fi
-    
+
     # Check timeout
     if [[ $waited -ge $max_wait ]]; then
       log_error "Timeout waiting for lock (${waited}s)"
       return 1
     fi
-    
+
     log_info "Lock held by PID $lock_pid, waiting... (${waited}/${max_wait}s)"
     sleep 5
     waited=$((waited + 5))
   done
-  
+
   log_info "Lock is now available"
   return 0
 }

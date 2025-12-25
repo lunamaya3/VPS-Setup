@@ -31,24 +31,24 @@ service_restart_with_retry() {
   local max_retries="${2:-3}"
   local delay="${3:-5}"
   local attempt=0
-  
+
   if [[ -z "$service_name" ]]; then
     log_error "service_restart_with_retry: service name required"
     return 1
   fi
-  
+
   log_info "Restarting service: $service_name"
-  
+
   while [[ $attempt -lt $max_retries ]]; do
     attempt=$((attempt + 1))
-    
+
     log_debug "Restart attempt $attempt/$max_retries"
-    
+
     # Attempt restart
     if systemctl restart "$service_name" 2>&1; then
       # Wait a moment for service to stabilize
       sleep 2
-      
+
       # Verify service is active
       if systemctl is-active --quiet "$service_name"; then
         log_info "Service $service_name restarted successfully"
@@ -59,20 +59,20 @@ service_restart_with_retry() {
     else
       log_warning "Restart command failed for $service_name"
     fi
-    
+
     # Check if we should retry
     if [[ $attempt -lt $max_retries ]]; then
       log_info "Retrying in ${delay}s..."
       sleep "$delay"
     fi
   done
-  
+
   log_error "Failed to restart $service_name after $max_retries attempts"
-  
+
   # Show service status for debugging
   log_error "Service status:"
   systemctl status "$service_name" --no-pager -l || true
-  
+
   return 1
 }
 
@@ -84,43 +84,43 @@ service_start_with_retry() {
   local max_retries="${2:-3}"
   local delay="${3:-5}"
   local attempt=0
-  
+
   if [[ -z "$service_name" ]]; then
     log_error "service_start_with_retry: service name required"
     return 1
   fi
-  
+
   # Check if already running
   if systemctl is-active --quiet "$service_name"; then
     log_info "Service $service_name is already running"
     return 0
   fi
-  
+
   log_info "Starting service: $service_name"
-  
+
   while [[ $attempt -lt $max_retries ]]; do
     attempt=$((attempt + 1))
-    
+
     log_debug "Start attempt $attempt/$max_retries"
-    
+
     if systemctl start "$service_name" 2>&1; then
       sleep 2
-      
+
       if systemctl is-active --quiet "$service_name"; then
         log_info "Service $service_name started successfully"
         return 0
       fi
     fi
-    
+
     if [[ $attempt -lt $max_retries ]]; then
       log_info "Retrying in ${delay}s..."
       sleep "$delay"
     fi
   done
-  
+
   log_error "Failed to start $service_name after $max_retries attempts"
   systemctl status "$service_name" --no-pager -l || true
-  
+
   return 1
 }
 
@@ -129,17 +129,17 @@ service_start_with_retry() {
 # Returns: 0 if in use, 1 if available
 check_port_in_use() {
   local port="$1"
-  
+
   if [[ -z "$port" ]]; then
     log_error "check_port_in_use: port number required"
     return 1
   fi
-  
+
   if ss -tuln | grep -q ":${port} "; then
-    return 0  # In use
+    return 0 # In use
   fi
-  
-  return 1  # Available
+
+  return 1 # Available
 }
 
 # Get process using a port
@@ -147,24 +147,24 @@ check_port_in_use() {
 # Returns: PID and process name
 get_port_owner() {
   local port="$1"
-  
+
   if [[ -z "$port" ]]; then
     log_error "get_port_owner: port number required"
     return 1
   fi
-  
+
   local owner_info
   owner_info=$(ss -tulnp | grep ":${port} " | head -1)
-  
+
   if [[ -z "$owner_info" ]]; then
     echo "None"
     return 0
   fi
-  
+
   # Extract process info from ss output
   local pid_info
   pid_info=$(echo "$owner_info" | grep -oP 'pid=\K[0-9]+' || echo "unknown")
-  
+
   if [[ "$pid_info" != "unknown" ]]; then
     local process_name
     process_name=$(ps -p "$pid_info" -o comm= 2>/dev/null || echo "unknown")
@@ -172,7 +172,7 @@ get_port_owner() {
   else
     echo "$owner_info"
   fi
-  
+
   return 0
 }
 
@@ -183,55 +183,55 @@ check_port_conflict() {
   local port="$1"
   local service_name="$2"
   local auto_stop="${3:-false}"
-  
+
   if [[ -z "$port" ]] || [[ -z "$service_name" ]]; then
     log_error "check_port_conflict: port and service name required"
     return 1
   fi
-  
+
   log_debug "Checking port conflict for port $port (service: $service_name)"
-  
+
   if ! check_port_in_use "$port"; then
     log_debug "Port $port is available"
     return 0
   fi
-  
+
   # Port is in use, get owner
   local owner
   owner=$(get_port_owner "$port")
-  
+
   log_warning "Port $port is already in use by: $owner"
   log_warning "This port is required for service: $service_name"
-  
+
   # Check if the owner is the service we're trying to start
   if echo "$owner" | grep -q "$service_name"; then
     log_info "Port is used by the target service ($service_name), this is expected"
     return 0
   fi
-  
+
   # Port is used by a different process
   if [[ "$auto_stop" == "true" ]]; then
     log_warning "Attempting to stop conflicting service..."
-    
+
     # Extract PID if possible
     local pid
     pid=$(echo "$owner" | grep -oP 'PID:\s*\K[0-9]+' || echo "")
-    
+
     if [[ -n "$pid" ]] && [[ "$pid" =~ ^[0-9]+$ ]]; then
       # Try to identify systemd service
       local unit
       unit=$(systemctl status "$pid" 2>/dev/null | grep -oP '●\s+\K\S+\.service' | head -1 || echo "")
-      
+
       if [[ -n "$unit" ]]; then
         log_info "Stopping conflicting service: $unit"
         systemctl stop "$unit" || {
           log_error "Failed to stop conflicting service: $unit"
           return 1
         }
-        
+
         # Wait for port to be released
         sleep 2
-        
+
         if ! check_port_in_use "$port"; then
           log_info "Port $port is now available"
           return 0
@@ -241,11 +241,11 @@ check_port_conflict() {
       fi
     fi
   fi
-  
+
   log_error "Port $port conflict unresolved"
   log_error "Manual intervention required: stop the process using port $port"
   log_error "Owner: $owner"
-  
+
   return 1
 }
 
@@ -254,14 +254,14 @@ check_port_conflict() {
 # Returns: 0 on success, 1 on failure
 service_enable() {
   local service_name="$1"
-  
+
   if [[ -z "$service_name" ]]; then
     log_error "service_enable: service name required"
     return 1
   fi
-  
+
   log_info "Enabling service at boot: $service_name"
-  
+
   if systemctl enable "$service_name" 2>&1; then
     log_info "Service $service_name enabled"
     return 0
@@ -276,15 +276,15 @@ service_enable() {
 # Returns: active, inactive, failed, or unknown
 service_get_status() {
   local service_name="$1"
-  
+
   if [[ -z "$service_name" ]]; then
     echo "unknown"
     return 0
   fi
-  
+
   local status
   status=$(systemctl is-active "$service_name" 2>/dev/null || echo "unknown")
-  
+
   echo "$status"
 }
 
@@ -293,11 +293,11 @@ service_get_status() {
 # Returns: 0 if running, 1 if not
 service_is_running() {
   local service_name="$1"
-  
+
   if systemctl is-active --quiet "$service_name" 2>/dev/null; then
     return 0
   fi
-  
+
   return 1
 }
 
@@ -308,24 +308,24 @@ service_wait_active() {
   local service_name="$1"
   local timeout="${2:-30}"
   local waited=0
-  
+
   if [[ -z "$service_name" ]]; then
     log_error "service_wait_active: service name required"
     return 1
   fi
-  
+
   log_debug "Waiting for service to become active: $service_name (timeout: ${timeout}s)"
-  
+
   while [[ $waited -lt $timeout ]]; do
     if systemctl is-active --quiet "$service_name"; then
       log_debug "Service $service_name is active after ${waited}s"
       return 0
     fi
-    
+
     sleep 1
     waited=$((waited + 1))
   done
-  
+
   log_error "Timeout waiting for service $service_name to become active (${timeout}s)"
   return 1
 }
@@ -335,19 +335,19 @@ service_wait_active() {
 # Returns: list of ports
 service_get_ports() {
   local service_name="$1"
-  
+
   if [[ -z "$service_name" ]]; then
     return 1
   fi
-  
+
   # Get main PID
   local main_pid
   main_pid=$(systemctl show -p MainPID --value "$service_name" 2>/dev/null)
-  
+
   if [[ -z "$main_pid" ]] || [[ "$main_pid" == "0" ]]; then
     return 1
   fi
-  
+
   # Find ports used by this process
   ss -tulnp | grep "pid=$main_pid" | grep -oP ':\K[0-9]+' | sort -u
 }

@@ -5,6 +5,10 @@
 psutil>=5.9.0        # Process and system monitoring for lock detection
 
 # Development dependencies (optional)
-pytest>=7.4.0      # Testing framework - required for test suite
-pylint>=2.17.0     # Code linting
-# black>=23.0.0      # Code formatting
+pytest>=7.4.0       # Testing framework - required for test suite
+pytest-cov>=4.1.0   # Coverage reporting for pytest
+pylint>=2.17.0      # Code linting
+black>=23.0.0       # Code formatting
+mypy>=1.0.0         # Type checking
+flake8>=6.0.0       # Python linting
+codespell>=2.2.0    # Spell checking for code and docs

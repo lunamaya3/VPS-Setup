@@ -67,11 +67,16 @@ teardown() {
   if ! type error_classify &>/dev/null; then
     skip "error_classify function not available"
   fi
-  # Mock command that fails twice then succeeds
-  local attempt_count=0
+  # Mock command that fails twice then succeeds using file-based counter
+  local counter_file="${TEST_DIR}/attempt_count"
+  echo "0" > "$counter_file"
+  
   mock_cmd() {
-    attempt_count=$((attempt_count + 1))
-    if [[ $attempt_count -lt 3 ]]; then
+    local counter_file="${TEST_DIR}/attempt_count"
+    local count=$(cat "$counter_file")
+    count=$((count + 1))
+    echo "$count" > "$counter_file"
+    if [[ $count -lt 3 ]]; then
       echo "Network error" >&2
       return 100
     fi
@@ -79,6 +84,7 @@ teardown() {
     return 0
   }
   export -f mock_cmd
+  export TEST_DIR
   
   run execute_with_retry "mock_cmd" 3 1
   [ "$status" -eq 0 ]
@@ -191,7 +197,7 @@ teardown() {
   fi
   run error_get_suggestion "$E_NETWORK"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"network connectivity"* ]]
+  [[ "$output" == *"internet connection"* ]]
 }
 
 @test "network: safe execute with all protections" {
@@ -240,17 +246,23 @@ teardown() {
   if ! type error_classify &>/dev/null; then
     skip "error_classify function not available"
   fi
-  # Mock command that fails with network error once
-  local call_count=0
+  # Mock command that fails with network error once using file-based counter
+  local counter_file="${TEST_DIR}/call_count"
+  echo "0" > "$counter_file"
+  
   mock_network_cmd() {
-    call_count=$((call_count + 1))
-    if [[ $call_count -eq 1 ]]; then
+    local counter_file="${TEST_DIR}/call_count"
+    local count=$(cat "$counter_file")
+    count=$((count + 1))
+    echo "$count" > "$counter_file"
+    if [[ $count -eq 1 ]]; then
       echo "Connection refused" >&2
       return 100
     fi
     return 0
   }
   export -f mock_network_cmd
+  export TEST_DIR
   
   run execute_with_retry "mock_network_cmd" 3 1
   [ "$status" -eq 0 ]

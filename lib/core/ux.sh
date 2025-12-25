@@ -25,9 +25,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/logger.sh"
 
 # Global UX settings
-UX_YES_MODE="${UX_YES_MODE:-false}"  # --yes flag bypasses prompts
-UX_INTERACTIVE="${UX_INTERACTIVE:-true}"  # UX-017: detect non-interactive shells
-UX_TERMINAL_WIDTH="${UX_TERMINAL_WIDTH:-80}"  # UX-018: default to 80 chars
+UX_YES_MODE="${UX_YES_MODE:-false}"          # --yes flag bypasses prompts
+UX_INTERACTIVE="${UX_INTERACTIVE:-true}"     # UX-017: detect non-interactive shells
+UX_TERMINAL_WIDTH="${UX_TERMINAL_WIDTH:-80}" # UX-018: default to 80 chars
 
 # Detect if running in non-interactive shell (CI/CD)
 ux_detect_interactive() {
@@ -41,7 +41,7 @@ ux_detect_interactive() {
 ux_detect_terminal_width() {
   if [[ -t 1 ]]; then
     # Terminal is a TTY, detect width
-    if command -v tput &> /dev/null; then
+    if command -v tput &>/dev/null; then
       UX_TERMINAL_WIDTH=$(tput cols 2>/dev/null || echo "${COLUMNS:-80}")
     elif [[ -n "${COLUMNS:-}" ]]; then
       UX_TERMINAL_WIDTH="${COLUMNS}"
@@ -56,12 +56,12 @@ ux_detect_terminal_width() {
       UX_TERMINAL_WIDTH=80
     fi
   fi
-  
+
   # Ensure minimum width
   if [[ ${UX_TERMINAL_WIDTH} -lt 40 ]]; then
     UX_TERMINAL_WIDTH=80
   fi
-  
+
   log_debug "Terminal width detected: ${UX_TERMINAL_WIDTH} columns"
 }
 
@@ -72,17 +72,17 @@ ux_wrap_text() {
   local text="$1"
   local indent="${2:-0}"
   local width=$((UX_TERMINAL_WIDTH - indent))
-  
+
   if [[ ${width} -lt 20 ]]; then
-    width=40  # Minimum readable width
+    width=40 # Minimum readable width
   fi
-  
+
   # Use fold or fmt if available, otherwise just output as-is
-  if command -v fold &> /dev/null; then
+  if command -v fold &>/dev/null; then
     local indent_str
     indent_str=$(printf '%*s' "$indent" '')
     echo "$text" | fold -w "$width" -s | sed "s/^/${indent_str}/"
-  elif command -v fmt &> /dev/null; then
+  elif command -v fmt &>/dev/null; then
     local indent_str
     indent_str=$(printf '%*s' "$indent" '')
     echo "$text" | fmt -w "$width" | sed "s/^/${indent_str}/"
@@ -100,7 +100,7 @@ ux_prompt_input() {
   local default="${2:-}"
   local validation_func="${3:-}"
   local response
-  
+
   # UX-017: Cannot prompt in non-interactive mode
   if [[ "${UX_INTERACTIVE}" == "false" ]]; then
     log_error "Cannot prompt for input in non-interactive shell"
@@ -111,22 +111,22 @@ ux_prompt_input() {
       return 1
     fi
   fi
-  
+
   # Display prompt
   if [[ -n "$default" ]]; then
     echo -n "${prompt} [${default}]: " >&2
   else
     echo -n "${prompt}: " >&2
   fi
-  
+
   # Read user input
   read -r response
-  
+
   # Use default if empty
   if [[ -z "$response" && -n "$default" ]]; then
     response="$default"
   fi
-  
+
   # Validate if function provided
   if [[ -n "$validation_func" ]]; then
     if ! "$validation_func" "$response"; then
@@ -134,7 +134,7 @@ ux_prompt_input() {
       return 1
     fi
   fi
-  
+
   echo "$response"
   return 0
 }
@@ -146,23 +146,23 @@ ux_prompt_input() {
 ux_prompt_password() {
   local prompt="$1"
   local password
-  
+
   # UX-017: Cannot prompt in non-interactive mode
   if [[ "${UX_INTERACTIVE}" == "false" ]]; then
     log_error "Cannot prompt for password in non-interactive shell"
     return 1
   fi
-  
+
   # Display prompt and read password (hidden)
   echo -n "${prompt}: " >&2
   read -rs password
-  echo "" >&2  # newline after hidden input
-  
+  echo "" >&2 # newline after hidden input
+
   if [[ -z "$password" ]]; then
     log_error "Password cannot be empty"
     return 1
   fi
-  
+
   echo "$password"
   return 0
 }
@@ -174,18 +174,18 @@ ux_prompt_confirm() {
   local prompt="$1"
   local default="${2:-}"
   local response
-  
+
   # UX-017: Cannot prompt in non-interactive mode or with --yes flag
   if [[ "${UX_YES_MODE}" == "true" ]]; then
     log_debug "Auto-confirming (--yes mode): $prompt"
     return 0
   fi
-  
+
   if [[ "${UX_INTERACTIVE}" == "false" ]]; then
     log_error "Cannot prompt for confirmation in non-interactive shell"
     return 1
   fi
-  
+
   # Display prompt with default indication
   if [[ "$default" == "y" ]]; then
     echo -n "${prompt} [Y/n]: " >&2
@@ -194,20 +194,20 @@ ux_prompt_confirm() {
   else
     echo -n "${prompt} [y/n]: " >&2
   fi
-  
+
   read -r response
-  
+
   # Use default if empty
   if [[ -z "$response" && -n "$default" ]]; then
     response="$default"
   fi
-  
+
   # Parse response
   case "${response,,}" in
-    y|yes)
+    y | yes)
       return 0
       ;;
-    n|no)
+    n | no)
       return 1
       ;;
     *)
@@ -229,31 +229,31 @@ ux_prompt_confirm() {
 confirm_action() {
   local prompt="$1"
   local warning="${2:-}"
-  
+
   # UX-017: Bypass in non-interactive mode or with --yes flag
   if [[ "${UX_YES_MODE}" == "true" ]]; then
     log_debug "Skipping confirmation (--yes mode): $prompt"
     return 0
   fi
-  
+
   if [[ "${UX_INTERACTIVE}" == "false" ]]; then
     log_error "Cannot prompt for confirmation in non-interactive shell"
     log_error "Use --yes flag to bypass confirmation prompts"
     return 1
   fi
-  
+
   # Display warning if provided
   if [[ -n "$warning" ]]; then
     log_warning "$warning"
   fi
-  
+
   # Prompt user
   echo ""
   echo -n "$prompt [y/N]: "
   read -r response
-  
+
   case "${response,,}" in
-    y|yes)
+    y | yes)
       log_debug "User confirmed: $prompt"
       return 0
       ;;
@@ -271,7 +271,7 @@ show_success_banner() {
   local rdp_port="${2:-3389}"
   local username="$3"
   local password="$4"
-  
+
   log_separator "="
   log_info ""
   log_info "=============================================================================="
@@ -312,7 +312,7 @@ show_success_banner() {
   log_info "For support, see: /usr/share/doc/vps-provision/README.md"
   log_info ""
   log_separator "="
-  
+
   # UX-024: Redact password in logs but display to terminal once
   if [[ -t 1 ]]; then
     echo ""
@@ -330,13 +330,13 @@ validate_input() {
   local pattern="$2"
   local field_name="$3"
   local requirements="$4"
-  
+
   if [[ ! "$value" =~ $pattern ]]; then
     log_error "[ERROR] Invalid ${field_name}: ${value}"
     log_error " > ${requirements}"
     return 1
   fi
-  
+
   log_debug "${field_name} validated successfully"
   return 0
 }
@@ -359,37 +359,37 @@ validate_username() {
 validate_password() {
   local password="$1"
   local min_length=16
-  
+
   if [[ ${#password} -lt $min_length ]]; then
     log_error "[ERROR] Password too short: ${#password} characters"
     log_error " > Password must be at least ${min_length} characters long"
     return 1
   fi
-  
+
   if ! [[ "$password" =~ [A-Z] ]]; then
     log_error "[ERROR] Password missing uppercase letter"
     log_error " > Password must contain at least one uppercase letter (A-Z)"
     return 1
   fi
-  
+
   if ! [[ "$password" =~ [a-z] ]]; then
     log_error "[ERROR] Password missing lowercase letter"
     log_error " > Password must contain at least one lowercase letter (a-z)"
     return 1
   fi
-  
+
   if ! [[ "$password" =~ [0-9] ]]; then
     log_error "[ERROR] Password missing digit"
     log_error " > Password must contain at least one digit (0-9)"
     return 1
   fi
-  
+
   if ! [[ "$password" =~ [^a-zA-Z0-9] ]]; then
     log_error "[ERROR] Password missing special character"
     log_error " > Password must contain at least one special character (!@#$%^&*)"
     return 1
   fi
-  
+
   log_debug "Password meets complexity requirements"
   return 0
 }
@@ -400,16 +400,16 @@ validate_password() {
 validate_ip_address() {
   local ip="$1"
   local ip_pattern='^([0-9]{1,3}\.){3}[0-9]{1,3}$'
-  
+
   if ! [[ "$ip" =~ $ip_pattern ]]; then
     log_error "[ERROR] Invalid IP address format: ${ip}"
     log_error " > Must be in format: xxx.xxx.xxx.xxx (e.g., 192.168.1.1)"
     return 1
   fi
-  
+
   # Validate octets are 0-255
   local IFS='.'
-  read -ra octets <<< "$ip"
+  read -ra octets <<<"$ip"
   for octet in "${octets[@]}"; do
     if [[ $octet -lt 0 || $octet -gt 255 ]]; then
       log_error "[ERROR] Invalid IP address octet: ${octet}"
@@ -417,7 +417,7 @@ validate_ip_address() {
       return 1
     fi
   done
-  
+
   log_debug "IP address validated successfully"
   return 0
 }
@@ -427,19 +427,19 @@ validate_ip_address() {
 # Returns: 0 if valid, 1 with feedback otherwise
 validate_port() {
   local port="$1"
-  
+
   if ! [[ "$port" =~ ^[0-9]+$ ]]; then
     log_error "[ERROR] Invalid port number: ${port}"
     log_error " > Port must be a number"
     return 1
   fi
-  
+
   if [[ $port -lt 1 || $port -gt 65535 ]]; then
     log_error "[ERROR] Port number out of range: ${port}"
     log_error " > Port must be between 1 and 65535"
     return 1
   fi
-  
+
   log_debug "Port validated successfully"
   return 0
 }
@@ -449,7 +449,7 @@ validate_port() {
 show_progress_start() {
   local message="$1"
   local duration="${2:-}"
-  
+
   if [[ -n "$duration" ]]; then
     log_info "$message (estimated: ${duration}s)"
   else
@@ -462,7 +462,7 @@ show_progress_start() {
 show_progress_complete() {
   local message="$1"
   local duration="${2:-}"
-  
+
   if [[ -n "$duration" ]]; then
     log_info "✓ $message (completed in ${duration}s)"
   else
@@ -476,7 +476,7 @@ show_error() {
   local severity="$1"
   local message="$2"
   local suggestion="$3"
-  
+
   if [[ "$severity" == "FATAL" ]]; then
     log_fatal "[$severity] $message"
   elif [[ "$severity" == "ERROR" ]]; then
@@ -484,7 +484,7 @@ show_error() {
   else
     log_warning "[$severity] $message"
   fi
-  
+
   if [[ -n "$suggestion" ]]; then
     log_error " > $suggestion"
   fi

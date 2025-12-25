@@ -60,10 +60,10 @@ readonly -a CORE_PACKAGES=(
 # Configure APT for provisioning
 system_prep_configure_apt() {
   log_info "Configuring APT for provisioning..."
-  
+
   # Create custom APT configuration
   # T132: Optimized with parallel downloads and HTTP pipelining per performance-specs.md
-  cat > "${APT_CUSTOM_CONF}" <<'EOF'
+  cat >"${APT_CUSTOM_CONF}" <<'EOF'
 # VPS Provisioning APT Configuration
 # Optimized for automated provisioning with error recovery
 
@@ -105,23 +105,23 @@ EOF
 # Update APT package lists
 system_prep_update_apt() {
   log_info "Updating APT package lists..."
-  
+
   local max_retries=3
   local retry_delay=5
-  
+
   for attempt in $(seq 1 ${max_retries}); do
     if apt-get update 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
       log_info "APT package lists updated successfully"
       transaction_log "apt_update" "package lists" "# No rollback for apt update"
       return 0
     fi
-    
+
     if [[ ${attempt} -lt ${max_retries} ]]; then
       log_warning "APT update failed (attempt ${attempt}/${max_retries}), retrying in ${retry_delay}s..."
       sleep ${retry_delay}
     fi
   done
-  
+
   log_error "Failed to update APT package lists after ${max_retries} attempts"
   return 1
 }
@@ -129,7 +129,7 @@ system_prep_update_apt() {
 # Upgrade existing packages
 system_prep_upgrade_packages() {
   log_info "Upgrading existing packages..."
-  
+
   # Use upgrade, not dist-upgrade to avoid potential conflicts
   if apt-get upgrade -y 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
     log_info "Existing packages upgraded successfully"
@@ -144,18 +144,18 @@ system_prep_upgrade_packages() {
 # Install core dependencies
 system_prep_install_core_packages() {
   log_info "Installing core dependencies..."
-  
+
   local failed_packages=()
-  
+
   for package in "${CORE_PACKAGES[@]}"; do
     log_info "Installing ${package}..."
-    
+
     # Check if already installed
     if dpkg -s "${package}" 2>/dev/null | grep -q "Status: install ok installed"; then
       log_info "${package} is already installed"
       continue
     fi
-    
+
     # Install package with retry logic
     if apt-get install -y "${package}" 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
       log_info "${package} installed successfully"
@@ -165,13 +165,13 @@ system_prep_install_core_packages() {
       failed_packages+=("${package}")
     fi
   done
-  
+
   # Report failures
   if [[ ${#failed_packages[@]} -gt 0 ]]; then
     log_error "Failed to install packages: ${failed_packages[*]}"
     return 1
   fi
-  
+
   log_info "All core packages installed successfully"
   return 0
 }
@@ -179,7 +179,7 @@ system_prep_install_core_packages() {
 # Verify package installation
 system_prep_verify_package() {
   local package=$1
-  
+
   if dpkg -s "${package}" 2>/dev/null | grep -q "Status: install ok installed"; then
     return 0
   else
@@ -190,16 +190,16 @@ system_prep_verify_package() {
 # Configure unattended upgrades
 system_prep_configure_unattended_upgrades() {
   log_info "Configuring unattended upgrades..."
-  
+
   # Backup original configuration if it exists
   if [[ -f "${UNATTENDED_UPGRADES_CONF}" ]]; then
     cp "${UNATTENDED_UPGRADES_CONF}" "${UNATTENDED_UPGRADES_CONF}.backup"
     transaction_log "backup_file" "${UNATTENDED_UPGRADES_CONF}" \
       "mv '${UNATTENDED_UPGRADES_CONF}.backup' '${UNATTENDED_UPGRADES_CONF}'"
   fi
-  
+
   # Create unattended upgrades configuration
-  cat > "${UNATTENDED_UPGRADES_CONF}" <<'EOF'
+  cat >"${UNATTENDED_UPGRADES_CONF}" <<'EOF'
 // VPS Provisioning: Unattended Upgrades Configuration
 // Automatically install security updates
 
@@ -229,7 +229,7 @@ EOF
 
   transaction_log "create_file" "${UNATTENDED_UPGRADES_CONF}" \
     "rm -f '${UNATTENDED_UPGRADES_CONF}'"
-  
+
   # Enable unattended upgrades
   if dpkg-reconfigure -plow unattended-upgrades 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
     log_info "Unattended upgrades configured successfully"
@@ -241,14 +241,14 @@ EOF
 # Fix broken packages (if any)
 system_prep_fix_broken_packages() {
   log_info "Checking for broken packages..."
-  
+
   # Try to fix broken packages
   if dpkg --configure -a 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
     log_info "dpkg configuration completed"
   else
     log_warning "dpkg --configure -a reported issues"
   fi
-  
+
   if apt-get install -f -y 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
     log_info "Dependency issues resolved"
   else
@@ -259,7 +259,7 @@ system_prep_fix_broken_packages() {
 # Clean APT cache
 system_prep_clean_apt_cache() {
   log_info "Cleaning APT cache..."
-  
+
   # Keep package lists but remove cached .deb files
   if apt-get clean 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
     log_info "APT cache cleaned (freed disk space)"
@@ -271,7 +271,7 @@ system_prep_clean_apt_cache() {
 # Harden SSH configuration per SEC-005, SEC-006
 system_prep_harden_ssh() {
   log_info "Hardening SSH configuration..."
-  
+
   # Backup original sshd_config before modifications per RR-004
   if [[ ! -f "${SSHD_CONFIG_BACKUP}" ]]; then
     if cp "${SSHD_CONFIG}" "${SSHD_CONFIG_BACKUP}"; then
@@ -283,12 +283,12 @@ system_prep_harden_ssh() {
       return 1
     fi
   fi
-  
+
   # Create hardened SSH configuration
   local temp_config="${SSHD_CONFIG}.tmp"
-  
+
   # SEC-005: Disable root login and password authentication
-  cat > "${temp_config}" <<'EOF'
+  cat >"${temp_config}" <<'EOF'
 # VPS Provisioning SSH Hardening Configuration
 # Generated by vps-provision system-prep module
 # SEC-005: Disable root login and password authentication
@@ -355,12 +355,12 @@ EOF
       transaction_log "modify_file" "${SSHD_CONFIG}" \
         "cp '${SSHD_CONFIG_BACKUP}' '${SSHD_CONFIG}' && systemctl restart sshd"
       log_info "SSH configuration hardened successfully"
-      
+
       # Restart SSH service to apply changes per RR-024
       local retry_count=0
       local max_retries=3
       local retry_delay=5
-      
+
       while [[ ${retry_count} -lt ${max_retries} ]]; do
         if systemctl restart sshd 2>&1 | tee -a "${LOG_FILE:-/dev/null}"; then
           log_info "SSH service restarted successfully"
@@ -375,7 +375,7 @@ EOF
           fi
         fi
       done
-      
+
       log_error "Failed to restart SSH service after ${max_retries} attempts"
       return 1
     else
@@ -393,9 +393,9 @@ EOF
 # Verify system preparation
 system_prep_verify() {
   log_info "Verifying system preparation..."
-  
+
   local verification_failed=false
-  
+
   # Verify all core packages installed
   for package in "${CORE_PACKAGES[@]}"; do
     if ! system_prep_verify_package "${package}"; then
@@ -403,23 +403,23 @@ system_prep_verify() {
       verification_failed=true
     fi
   done
-  
+
   # Verify APT configuration exists
   if [[ ! -f "${APT_CUSTOM_CONF}" ]]; then
     log_error "Verification failed: APT configuration missing"
     verification_failed=true
   fi
-  
+
   # Verify unattended upgrades configuration
   if [[ ! -f "${UNATTENDED_UPGRADES_CONF}" ]]; then
     log_error "Verification failed: Unattended upgrades configuration missing"
     verification_failed=true
   fi
-  
+
   # Verify SSH hardening applied
   if [[ -f "${SSHD_CONFIG}" ]]; then
-    if grep -q "^PermitRootLogin no" "${SSHD_CONFIG}" && \
-       grep -q "^PasswordAuthentication no" "${SSHD_CONFIG}"; then
+    if grep -q "^PermitRootLogin no" "${SSHD_CONFIG}" &&
+      grep -q "^PasswordAuthentication no" "${SSHD_CONFIG}"; then
       log_info "SSH hardening verified (root login disabled, password auth disabled)"
     else
       log_error "Verification failed: SSH hardening not applied"
@@ -429,7 +429,7 @@ system_prep_verify() {
     log_error "Verification failed: SSH configuration file missing"
     verification_failed=true
   fi
-  
+
   # Verify SSH service running
   if systemctl is-active --quiet sshd; then
     log_info "SSH service is active"
@@ -437,7 +437,7 @@ system_prep_verify() {
     log_error "Verification failed: SSH service not running"
     verification_failed=true
   fi
-  
+
   # Verify critical commands available
   local -a critical_commands=("git" "curl" "wget" "gcc" "make")
   for cmd in "${critical_commands[@]}"; do
@@ -446,12 +446,12 @@ system_prep_verify() {
       verification_failed=true
     fi
   done
-  
+
   if [[ "${verification_failed}" == "true" ]]; then
     log_error "System preparation verification failed"
     return 1
   fi
-  
+
   log_info "System preparation verification passed"
   return 0
 }
@@ -459,67 +459,67 @@ system_prep_verify() {
 # Main execution function
 system_prep_execute() {
   log_info "Starting system preparation phase..."
-  
+
   # Check if already completed
   if checkpoint_exists "${SYSTEM_PREP_PHASE}"; then
     log_info "System preparation already completed (checkpoint exists)"
     return 0
   fi
-  
+
   # Start checkpoint
   checkpoint_start "${SYSTEM_PREP_PHASE}"
-  
+
   # Configure APT
   if ! system_prep_configure_apt; then
     log_error "Failed to configure APT"
     return 1
   fi
-  
+
   # Update package lists
   if ! system_prep_update_apt; then
     log_error "Failed to update APT package lists"
     return 1
   fi
-  
+
   # Upgrade existing packages
   if ! system_prep_upgrade_packages; then
     log_error "Failed to upgrade packages"
     return 1
   fi
-  
+
   # Fix any broken packages before installing new ones
   system_prep_fix_broken_packages
-  
+
   # Install core dependencies
   if ! system_prep_install_core_packages; then
     log_error "Failed to install core packages"
     return 1
   fi
-  
+
   # Configure unattended upgrades
   if ! system_prep_configure_unattended_upgrades; then
     log_error "Failed to configure unattended upgrades"
     return 1
   fi
-  
+
   # Harden SSH configuration per SEC-005, SEC-006
   if ! system_prep_harden_ssh; then
     log_error "Failed to harden SSH configuration"
     return 1
   fi
-  
+
   # Clean APT cache
   system_prep_clean_apt_cache
-  
+
   # Verify installation
   if ! system_prep_verify; then
     log_error "System preparation verification failed"
     return 1
   fi
-  
+
   # Complete checkpoint
   checkpoint_complete "${SYSTEM_PREP_PHASE}"
-  
+
   log_info "System preparation phase completed successfully"
   return 0
 }
