@@ -232,8 +232,8 @@ ide_vscode_verify() {
     return 1
   fi
 
-  # Check version (brief launch)
-  if ! timeout 10 code --version &>/dev/null; then
+  # Check version (without display to prevent GUI initialization)
+  if ! timeout 10 env DISPLAY= code --version &>/dev/null; then
     log_error "VSCode version check failed (--version command failed)"
     return 1
   fi
