@@ -291,6 +291,39 @@ log_redacted() {
   esac
 }
 
+# Alias for compatibility
+log_redact_sensitive() {
+  log_redact "$@"
+}
+
+# Log with explicit level
+# Args: $1 - log level string (DEBUG, INFO, WARNING, ERROR, FATAL), $@ - message
+log_with_level() {
+  local level="$1"
+  shift
+  local message="$*"
+  
+  case "${level^^}" in
+    DEBUG)   log_debug "$message" ;;
+    INFO)    log_info "$message" ;;
+    WARNING) log_warning "$message" ;;
+    ERROR)   log_error "$message" ;;
+    FATAL)   log_fatal "$message" ;;
+    *)       log_info "$message" ;;
+  esac
+}
+
+# Log transaction entry (for transaction log)
+# Args: $1 - action, $2 - rollback command
+log_transaction_entry() {
+  local action="$1"
+  local rollback_command="$2"
+  local timestamp
+  timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  
+  echo "${timestamp}|${action}|${rollback_command}" >> "$TRANSACTION_LOG"
+}
+
 # Export functions for use in other scripts
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   # Script is being run directly, not sourced

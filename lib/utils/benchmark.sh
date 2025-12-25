@@ -192,7 +192,7 @@ EOF
 }
 
 # Compare current run against baseline
-# Args: $1 - current results file, $2 - baseline results file
+# Args: $1 - current results file (optional), $2 - baseline results file (optional)
 benchmark_compare() {
   local current_file="${1:-$BENCHMARK_RESULTS_FILE}"
   local baseline_file="${2:-${BENCHMARK_DIR}/baseline.json}"
@@ -232,5 +232,5 @@ benchmark_compare() {
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   benchmark_init
   benchmark_run_all
-  benchmark_compare
+  benchmark_compare "${BENCHMARK_RESULTS_FILE:-}" "${BENCHMARK_DIR}/baseline.json"
 fi

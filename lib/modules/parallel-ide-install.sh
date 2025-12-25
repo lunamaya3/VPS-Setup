@@ -256,6 +256,11 @@ parallel_ide_check_all_installed() {
   fi
 }
 
+# Alias for module contract compliance
+parallel_ide_install_execute() {
+  parallel_ide_execute
+}
+
 # Export functions
 export -f parallel_ide_init
 export -f parallel_ide_cleanup
@@ -263,6 +268,7 @@ export -f parallel_ide_install_vscode
 export -f parallel_ide_install_cursor
 export -f parallel_ide_install_antigravity
 export -f parallel_ide_execute
+export -f parallel_ide_install_execute
 export -f parallel_ide_check_all_installed
 
 # Main execution when run as script

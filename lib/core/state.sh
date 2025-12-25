@@ -276,41 +276,7 @@ EOF
   return 0
 }
 
-# Set VPS instance information
-state_set_vps_info() {
-  local vps_info_json="${1}"
-  
-  if [[ -z "${CURRENT_SESSION_FILE}" ]]; then
-    log_error "No active session"
-    return 1
-  fi
-  
-  local updated_json
-  updated_json=$(jq --argjson info "${vps_info_json}" \
-                    '.vps_info = $info' \
-                    "${CURRENT_SESSION_FILE}")
-  
-  echo "${updated_json}" > "${CURRENT_SESSION_FILE}"
-  return 0
-}
 
-# Set developer user information
-state_set_developer_user() {
-  local user_info_json="${1}"
-  
-  if [[ -z "${CURRENT_SESSION_FILE}" ]]; then
-    log_error "No active session"
-    return 1
-  fi
-  
-  local updated_json
-  updated_json=$(jq --argjson user "${user_info_json}" \
-                    '.developer_user = $user' \
-                    "${CURRENT_SESSION_FILE}")
-  
-  echo "${updated_json}" > "${CURRENT_SESSION_FILE}"
-  return 0
-}
 
 # Add IDE installation record
 state_add_ide() {

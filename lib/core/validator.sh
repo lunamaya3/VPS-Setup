@@ -102,6 +102,20 @@ validator_check_cpu() {
 # Check disk space
 # Args: $1 - minimum disk space in GB (default: 25)
 # Returns: 0 if sufficient, 1 if insufficient
+validator_check_disk_space() {
+  validator_check_disk "$@"
+}
+
+# Check memory (RAM)
+# Args: $1 - minimum RAM in GB (default: 2)
+# Returns: 0 if sufficient, 1 if insufficient
+validator_check_memory() {
+  validator_check_ram "$@"
+}
+
+# Check disk space
+# Args: $1 - minimum disk space in GB (default: 25)
+# Returns: 0 if sufficient, 1 if insufficient
 validator_check_disk() {
   local min_disk_gb="${1:-25}"
   log_info "Checking disk space (minimum: ${min_disk_gb}GB)..."

@@ -64,6 +64,7 @@ teardown() {
 
 @test "state_init_session sets current session variables" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set vars in current shell
   
   [[ "$CURRENT_SESSION_ID" == "$session_id" ]]
   [[ -n "$CURRENT_SESSION_FILE" ]]
@@ -89,6 +90,7 @@ teardown() {
 
 @test "state_save_session updates session file" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE
   
   # Modify in-memory state
   export SESSION_STATUS="IN_PROGRESS"
@@ -100,6 +102,7 @@ teardown() {
 
 @test "state_update_phase adds phase to session" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE
   
   state_update_phase "system-prep" "IN_PROGRESS"
   
@@ -108,6 +111,7 @@ teardown() {
 
 @test "state_update_phase tracks phase status" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE
   
   state_update_phase "desktop-env" "COMPLETED"
   
@@ -119,6 +123,7 @@ teardown() {
 
 @test "state_get_phase_status returns correct status" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"
   
   state_update_phase "test-phase" "IN_PROGRESS"
   
@@ -129,6 +134,7 @@ teardown() {
 
 @test "state_set_session_status updates session status" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"
   
   state_set_session_status "COMPLETED"
   
@@ -137,6 +143,7 @@ teardown() {
 
 @test "state_set_error_details records error information" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"
   
   state_set_error_details "Test error message"
   
@@ -145,6 +152,7 @@ teardown() {
 
 @test "state_get_session_duration calculates elapsed time" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"
   
   sleep 2
   
@@ -155,6 +163,7 @@ teardown() {
 
 @test "state_finalize_session sets end time and duration" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"
   
   sleep 1
   
@@ -174,8 +183,8 @@ teardown() {
   
   sessions=$(state_list_sessions)
   
-  # Should have at least 2 sessions
-  count=$(echo "$sessions" | wc -l)
+  # Should have at least 2 sessions (JSON array)
+  count=$(echo "$sessions" | jq '. | length')
   [[ $count -ge 2 ]]
 }
 
@@ -223,6 +232,7 @@ teardown() {
 
 @test "state tracks multiple phases in order" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"
   
   state_update_phase "phase1" "COMPLETED"
   state_update_phase "phase2" "IN_PROGRESS"
@@ -237,6 +247,7 @@ teardown() {
 
 @test "state preserves VPS info" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE in current shell
   
   state_set_vps_info "hostname" "test-vps"
   state_set_vps_info "ip_address" "192.168.1.100"
@@ -249,6 +260,7 @@ teardown() {
 
 @test "state preserves developer user info" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE in current shell
   
   state_set_developer_user "testuser"
   
@@ -257,6 +269,7 @@ teardown() {
 
 @test "state tracks IDE installations" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE in current shell
   
   state_add_ide_installation "vscode" "1.85.0" "COMPLETED"
   state_add_ide_installation "cursor" "0.12.0" "COMPLETED"
@@ -302,6 +315,7 @@ teardown() {
 
 @test "state_validate_session fails for corrupted session" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE in current shell
   
   # Corrupt the session file
   echo "invalid json" > "$CURRENT_SESSION_FILE"
@@ -313,6 +327,7 @@ teardown() {
 
 @test "state persists across process restarts" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE in current shell
   state_update_phase "test-phase" "COMPLETED"
   
   # Unload state module
@@ -338,6 +353,7 @@ teardown() {
 
 @test "state_get_all_phases returns phase list" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE in current shell
   
   state_update_phase "phase1" "COMPLETED"
   state_update_phase "phase2" "IN_PROGRESS"
@@ -350,6 +366,7 @@ teardown() {
 
 @test "state handles ISO 8601 timestamps correctly" {
   session_id=$(state_init_session)
+  state_load_session "$session_id"  # Reload to set CURRENT_SESSION_FILE in current shell
   
   session_file="$CURRENT_SESSION_FILE"
   timestamp=$(grep '"start_time"' "$session_file" | cut -d'"' -f4)

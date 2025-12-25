@@ -499,7 +499,6 @@ main() {
     
     for phase in "${phase_order[@]}"; do
       local duration="${phase_durations[$phase]}"
-      local checkpoint_exists=false
       local will_skip=false
       local status="WILL RUN"
       local notes=""

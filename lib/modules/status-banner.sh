@@ -78,5 +78,23 @@ display_ready_banner() {
   return 0
 }
 
-# Export function
+# Module execute function (for contract compliance)
+status_banner_execute() {
+  local dev_username="${1:-devuser}"
+  local dev_password="${2:-[Generated]}"
+  display_ready_banner "$dev_username" "$dev_password"
+}
+
+# Show RDP connection info
+status_banner_show_rdp_info() {
+  local ip_address
+  ip_address=$(hostname -I | awk '{print $1}' || echo "unknown")
+  local rdp_port="3389"
+  
+  echo "RDP: ${ip_address}:${rdp_port}"
+}
+
+# Export functions
 export -f display_ready_banner
+export -f status_banner_execute
+export -f status_banner_show_rdp_info

@@ -248,6 +248,34 @@ sanitize_phase_name() {
 }
 
 #######################################
+# Sanitize file path input
+# Alias for sanitize_path for consistency
+# Arguments:
+#   $1 - File path to sanitize
+# Outputs:
+#   Sanitized path to stdout
+# Returns:
+#   0 if path is safe, 1 otherwise
+#######################################
+sanitize_filepath() {
+  sanitize_path "$1"
+}
+
+#######################################
+# Sanitize generic input
+# Alias for sanitize_string for consistency
+# Arguments:
+#   $1 - Input to sanitize
+# Outputs:
+#   Sanitized string to stdout
+# Returns:
+#   0 on success, 1 on failure
+#######################################
+sanitize_input() {
+  sanitize_string "$1"
+}
+
+#######################################
 # Escape string for safe use in shell commands
 # Use this when you must pass user input to a shell command
 # Globals:

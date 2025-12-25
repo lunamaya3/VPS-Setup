@@ -38,21 +38,21 @@ class PackageManager:
     def check_stale_lock(self) -> Tuple[bool, List[str]]:
         """
         Check for stale lock files and attempt to release them
-        
+
         Returns:
             Tuple of (has_stale_locks: bool, stale_files: List[str])
         """
         stale_locks = []
-        
+
         for lock_file in self.LOCK_FILES:
             if not os.path.exists(lock_file):
                 continue
-            
+
             try:
                 # Try to open lock file to check if process is holding it
                 with open(f"{lock_file}.lock", 'r') as f:
                     pid = f.read().strip()
-                    
+
                     if pid and pid.isdigit():
                         try:
                             # Check if process is still running
@@ -65,25 +65,25 @@ class PackageManager:
             except (FileNotFoundError, PermissionError):
                 # No lock file or can't read it
                 pass
-        
+
         return (len(stale_locks) > 0, stale_locks)
 
     def release_stale_locks(self) -> bool:
         """
         Release stale lock files (requires root)
-        
+
         Returns:
             True if locks were released, False otherwise
         """
         has_stale, stale_files = self.check_stale_lock()
-        
+
         if not has_stale:
             return True
-        
+
         if os.geteuid() != 0:
             print("Error: Root privileges required to release lock files", file=sys.stderr)
             return False
-        
+
         for lock_file in stale_files:
             try:
                 os.remove(lock_file)
@@ -91,7 +91,7 @@ class PackageManager:
             except OSError as e:
                 print(f"Failed to release {lock_file}: {e}", file=sys.stderr)
                 return False
-        
+
         # Run dpkg --configure -a to ensure consistent state
         try:
             subprocess.run(
@@ -103,13 +103,13 @@ class PackageManager:
             print("Reconfigured packages after lock release")
         except subprocess.CalledProcessError as e:
             print(f"Warning: dpkg --configure failed: {e.stderr}", file=sys.stderr)
-        
+
         return True
 
     def check_repository_connectivity(self) -> Dict[str, Any]:
         """
         Check connectivity to configured APT repositories
-        
+
         Returns:
             Dict with repository check results
         """
@@ -118,7 +118,7 @@ class PackageManager:
             "repositories": [],
             "failures": []
         }
-        
+
         try:
             # Get list of repositories
             sources_result = subprocess.run(
@@ -127,14 +127,14 @@ class PackageManager:
                 text=True,
                 check=True
             )
-            
+
             # Extract repository URLs
             repos = set()
             for line in sources_result.stdout.split("\n"):
                 if line.strip().startswith("http"):
                     url = line.strip().split()[0]
                     repos.add(url)
-            
+
             # Test connectivity to each repository
             for repo_url in repos:
                 try:
@@ -146,9 +146,9 @@ class PackageManager:
                         timeout=10,
                         check=False
                     )
-                    
+
                     http_code = test_result.stdout.strip()
-                    
+
                     if http_code.startswith("2") or http_code.startswith("3"):
                         result["repositories"].append({
                             "url": repo_url,
@@ -163,7 +163,7 @@ class PackageManager:
                             "accessible": False,
                             "http_code": http_code
                         })
-                
+
                 except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
                     result["all_accessible"] = False
                     result["failures"].append(repo_url)
@@ -172,16 +172,16 @@ class PackageManager:
                         "accessible": False,
                         "error": str(e)
                     })
-        
+
         except subprocess.CalledProcessError as e:
             result["error"] = f"Failed to check repositories: {e.stderr}"
-        
+
         return result
 
     def fix_broken_dependencies(self) -> Tuple[bool, str]:
         """
         Attempt to fix broken package dependencies
-        
+
         Returns:
             Tuple of (success: bool, output: str)
         """
@@ -194,9 +194,9 @@ class PackageManager:
                 check=True,
                 env={"DEBIAN_FRONTEND": "noninteractive"}
             )
-            
+
             return (True, result.stdout)
-        
+
         except subprocess.CalledProcessError as e:
             # If that fails, try dpkg --configure -a
             try:
@@ -206,7 +206,7 @@ class PackageManager:
                     text=True,
                     check=True
                 )
-                
+
                 # Try fix-broken again
                 result = subprocess.run(
                     ["apt-get", "--fix-broken", "install", "-y"],
@@ -215,9 +215,9 @@ class PackageManager:
                     check=True,
                     env={"DEBIAN_FRONTEND": "noninteractive"}
                 )
-                
+
                 return (True, result.stdout)
-            
+
             except subprocess.CalledProcessError as e2:
                 return (False, f"Failed to fix dependencies: {e.stderr}\n{e2.stderr}")
 

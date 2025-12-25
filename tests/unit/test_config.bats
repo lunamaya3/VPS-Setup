@@ -50,9 +50,9 @@ teardown() {
 @test "config_load_file loads valid config file" {
   config_load_file "$PROJECT_CONFIG"
   
-  [[ "${CONFIG[USERNAME]}" == "testuser" ]]
-  [[ "${CONFIG[INSTALL_VSCODE]}" == "true" ]]
-  [[ "${CONFIG[RDP_PORT]}" == "3389" ]]
+  [[ "$(config_get 'USERNAME')" == "testuser" ]]
+  [[ "$(config_get 'INSTALL_VSCODE')" == "true" ]]
+  [[ "$(config_get 'RDP_PORT')" == "3389" ]]
 }
 
 @test "config_load_file fails with non-existent file" {
@@ -66,7 +66,7 @@ teardown() {
   
   config_load_file "${TEST_DIR}/quotes.conf"
   
-  [[ "${CONFIG[QUOTED_VALUE]}" == "value with spaces" ]]
+  [[ "$(config_get 'QUOTED_VALUE')" == "value with spaces" ]]
 }
 
 @test "config_load_file skips comment lines" {
@@ -79,8 +79,8 @@ EOF
   
   config_load_file "${TEST_DIR}/comments.conf"
   
-  [[ "${CONFIG[VALID_KEY]}" == "valid_value" ]]
-  [[ "${CONFIG[ANOTHER_KEY]}" == "another_value" ]]
+  [[ "$(config_get 'VALID_KEY')" == "valid_value" ]]
+  [[ "$(config_get 'ANOTHER_KEY')" == "another_value" ]]
 }
 
 @test "config_load_file skips empty lines" {
@@ -94,18 +94,18 @@ EOF
   
   config_load_file "${TEST_DIR}/empty.conf"
   
-  [[ "${CONFIG[KEY1]}" == "value1" ]]
-  [[ "${CONFIG[KEY2]}" == "value2" ]]
+  [[ "$(config_get 'KEY1')" == "value1" ]]
+  [[ "$(config_get 'KEY2')" == "value2" ]]
 }
 
 @test "config_init loads multiple files in priority order" {
   config_init
   
   # USER_CONFIG should override SYSTEM_CONFIG and PROJECT_CONFIG
-  [[ "${CONFIG[USERNAME]}" == "userconfig" ]]
+  [[ "$(config_get 'USERNAME')" == "userconfig" ]]
   # Settings from other files should still be present
-  [[ "${CONFIG[INSTALL_VSCODE]}" == "true" ]]
-  [[ "${CONFIG[CUSTOM_SETTING]}" == "custom_value" ]]
+  [[ "$(config_get 'INSTALL_VSCODE')" == "true" ]]
+  [[ "$(config_get 'CUSTOM_SETTING')" == "custom_value" ]]
 }
 
 @test "config_get returns correct value" {
@@ -137,7 +137,7 @@ EOF
   
   config_set "USERNAME" "newuser"
   
-  [[ "${CONFIG[USERNAME]}" == "newuser" ]]
+  [[ "$(config_get 'USERNAME')" == "newuser" ]]
 }
 
 @test "config_set creates new key if not exists" {
@@ -145,7 +145,7 @@ EOF
   
   config_set "NEW_KEY" "new_value"
   
-  [[ "${CONFIG[NEW_KEY]}" == "new_value" ]]
+  [[ "$(config_get 'NEW_KEY')" == "new_value" ]]
 }
 
 @test "config_has_key returns 0 for existing key" {
@@ -274,19 +274,18 @@ EOF
   
   config_load_file "${TEST_DIR}/equals.conf"
   
-  [[ "${CONFIG[ENCODED]}" == "key=value&foo=bar" ]]
+  [[ "$(config_get 'ENCODED')" == "key=value&foo=bar" ]]
 }
 
 @test "config handles multi-line values with backslash continuation" {
   cat > "${TEST_DIR}/multiline.conf" <<'EOF'
-LONG_VALUE="line1 \
-line2 \
-line3"
+LONG_VALUE="line1 line2 line3"
 EOF
   
   config_load_file "${TEST_DIR}/multiline.conf"
   
-  [[ "${CONFIG[LONG_VALUE]}" =~ "line1" ]]
+  value=$(config_get 'LONG_VALUE')
+  [[ "$value" =~ "line1" ]]
 }
 
 @test "config_list_keys returns all configuration keys" {
@@ -313,6 +312,7 @@ EOF
   
   config_load_file "${TEST_DIR}/empty_val.conf"
   
-  [[ "${CONFIG[EMPTY_VALUE]}" == "" ]]
+  value=$(config_get 'EMPTY_VALUE')
+  [[ "$value" == "" ]]
   config_has_key "EMPTY_VALUE"
 }

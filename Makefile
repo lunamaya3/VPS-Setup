@@ -54,7 +54,7 @@ install: ## Install dependencies (bats, python requirements)
 	@chmod +x .git/hooks/pre-commit .git/hooks/pre-push 2>/dev/null || echo "Git hooks not found (run in git repository)"
 	@printf "$(COLOR_GREEN)Dependencies installed successfully!$(COLOR_RESET)\n"
 
-test: test-unit test-integration test-contract ## Run all tests
+test: test-unit test-integration test-contract test-python ## Run all tests
 	@echo ""
 	@printf "$(COLOR_GREEN)✓ All tests passed!$(COLOR_RESET)\n"
 
@@ -80,6 +80,17 @@ test-contract: ## Run contract tests
 		bats $(TEST_CONTRACT_DIR)/*.bats; \
 	else \
 		echo "No contract tests found in $(TEST_CONTRACT_DIR)"; \
+	fi
+
+test-python: ## Run Python unit tests with pytest
+	@printf "$(COLOR_YELLOW)Running Python tests...$(COLOR_RESET)\n"
+	@if command -v pytest &> /dev/null; then \
+		pytest -v $(TEST_DIR) $(LIB_DIR)/utils; \
+	elif $(PYTHON) -m pytest --version &> /dev/null; then \
+		$(PYTHON) -m pytest -v $(TEST_DIR) $(LIB_DIR)/utils; \
+	else \
+		printf "$(COLOR_YELLOW)⚠️  pytest not installed. Install with: pip3 install pytest$(COLOR_RESET)\n"; \
+		exit 1; \
 	fi
 
 test-e2e: ## Run end-to-end tests (requires VPS)

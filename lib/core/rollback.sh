@@ -209,14 +209,18 @@ rollback_phase() {
 # Returns: list of rollback commands
 rollback_dry_run() {
   log_info "Rollback Dry-Run:"
+  echo "Rollback Dry-Run:"
   log_info "The following commands would be executed (in order):"
+  echo "The following commands would be executed (in order):"
   log_separator "-"
+  echo "----------------------------------------"
   
   local transaction_count
   transaction_count=$(transaction_count)
   
   if [[ $transaction_count -eq 0 ]]; then
     log_info "  (no transactions to rollback)"
+    echo "  (no transactions to rollback)"
     return 0
   fi
   
@@ -229,10 +233,13 @@ rollback_dry_run() {
   for cmd in "${commands[@]}"; do
     count=$((count + 1))
     log_info "  [$count] $cmd"
+    echo "  [$count] $cmd"
   done
   
   log_separator "-"
+  echo "----------------------------------------"
   log_info "Total rollback commands: $count"
+  echo "Total rollback commands: $count"
   
   return 0
 }
@@ -248,6 +255,18 @@ rollback_is_in_progress() {
 # Get rollback error count
 rollback_get_error_count() {
   echo "$ROLLBACK_ERRORS"
+}
+
+# Get rollback statistics
+# Returns: JSON string with stats
+rollback_get_stats() {
+  local total_count
+  local error_count
+  
+  total_count=$(transaction_count 2>/dev/null || echo "0")
+  error_count="$ROLLBACK_ERRORS"
+  
+  echo "{\"total\":${total_count},\"errors\":${error_count},\"in_progress\":${ROLLBACK_IN_PROGRESS}}"
 }
 
 # Clean up rollback artifacts

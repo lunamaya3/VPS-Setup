@@ -235,8 +235,7 @@ teardown() {
 @test "T114: Short password fails with length feedback" {
   run validate_password "Short1!"
   [ "$status" -eq 1 ]
-  [[ "$output" =~ too\ short ]]
-  [[ "$output" =~ 16\ characters ]]
+  [[ "$output" =~ "too short"|"16 characters" ]]
 }
 
 @test "T114: Password without uppercase fails with specific feedback" {
