@@ -69,7 +69,13 @@ validator_check_ram() {
 
   log_info "Available RAM: ${total_ram_gb}GB"
 
-  if (($(echo "$total_ram_gb < $min_ram_gb" | bc -l))); then
+  # Convert to integer comparison (multiply by 100 to handle decimals)
+  local total_ram_int
+  total_ram_int=$(awk "BEGIN {printf \"%.0f\", $total_ram_gb * 100}")
+  local min_ram_int
+  min_ram_int=$(awk "BEGIN {printf \"%.0f\", $min_ram_gb * 100}")
+
+  if ((total_ram_int < min_ram_int)); then
     log_error "Insufficient RAM: ${total_ram_gb}GB < ${min_ram_gb}GB"
     VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
     return 1
