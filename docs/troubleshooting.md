@@ -9,9 +9,10 @@
 5. [Performance Problems](#performance-problems)
 6. [Network Issues](#network-issues)
 7. [Recovery Procedures](#recovery-procedures)
-8. [Debug Mode](#debug-mode)
-9. [Logging](#logging)
-10. [Getting Help](#getting-help)
+8. [KVM Testing Issues](#kvm-testing-issues)
+9. [Debug Mode](#debug-mode)
+10. [Logging](#logging)
+11. [Getting Help](#getting-help)
 
 ## Common Issues
 
@@ -577,6 +578,316 @@ apt-get remove --purge xfce4 xfce4-goodies xrdp
 # Run fresh provisioning
 vps-provision --force
 ```
+
+---
+
+## KVM Testing Issues
+
+### Issue: KVM Not Available (/dev/kvm not found)
+
+**Symptom**: `make check-kvm-prerequisites` fails with "KVM not available"
+
+**Cause**: KVM kernel modules not loaded or hardware virtualization disabled
+
+**Solution**:
+
+```bash
+# Check if KVM modules are loaded
+lsmod | grep kvm
+
+# Load KVM modules
+sudo modprobe kvm
+sudo modprobe kvm_intel  # or kvm_amd for AMD CPUs
+
+# Make modules load on boot
+echo "kvm" | sudo tee -a /etc/modules
+echo "kvm_intel" | sudo tee -a /etc/modules  # or kvm_amd
+
+# Verify KVM device
+ls -la /dev/kvm
+# Expected: crw-rw---- 1 root kvm
+
+# Check CPU virtualization support
+egrep -c '(vmx|svm)' /proc/cpuinfo
+# Expected: non-zero number
+```
+
+**Hardware Check**:
+
+```bash
+# For Intel CPUs
+grep vmx /proc/cpuinfo
+
+# For AMD CPUs
+grep svm /proc/cpuinfo
+
+# If empty, enable virtualization in BIOS/UEFI
+```
+
+---
+
+### Issue: Libvirt Permission Denied
+
+**Symptom**: `virsh` commands fail with "permission denied"
+
+**Cause**: User not in libvirt group
+
+**Solution**:
+
+```bash
+# Add user to libvirt group
+sudo usermod -aG libvirt $USER
+
+# Apply group membership (choose one):
+newgrp libvirt  # In current shell
+# OR
+# Logout and login again
+
+# Verify group membership
+groups | grep libvirt
+
+# Test virsh access
+virsh version
+```
+
+---
+
+### Issue: Base Image Not Found
+
+**Symptom**: KVM test fails with "Base image not found"
+
+**Cause**: Base image not built or in wrong location
+
+**Solution**:
+
+```bash
+# Check if image exists
+sudo ls -lh /var/lib/libvirt/images/debian-13-base
+
+# Build base image if missing
+cd tests/e2e/packer
+./build-base-image.sh
+
+# Verify build completed
+sudo ls -lh /var/lib/libvirt/images/debian-13-base*
+
+# Check disk space for images
+df -h /var/lib/libvirt/images
+```
+
+**Alternative**: Use manual base image creation (see [docs/testing-isolation-kvm.md](testing-isolation-kvm.md#manual-base-image-creation-alternative))
+
+---
+
+### Issue: VM Network Timeout
+
+**Symptom**: Test fails with "Timeout waiting for VM IP address"
+
+**Cause**: Libvirt network not running or firewall blocking DHCP
+
+**Solution**:
+
+```bash
+# Check libvirt networks
+sudo virsh net-list --all
+
+# Start default network if stopped
+sudo virsh net-start default
+sudo virsh net-autostart default
+
+# Verify network is active
+sudo virsh net-info default
+
+# Check DHCP range
+sudo virsh net-dumpxml default | grep dhcp
+
+# Test DHCP not blocked by firewall
+sudo iptables -L -n | grep 67
+sudo iptables -L -n | grep 68
+
+# If blocked, allow DHCP
+sudo iptables -I INPUT -p udp --dport 67:68 -j ACCEPT
+sudo iptables -I OUTPUT -p udp --sport 67:68 -j ACCEPT
+```
+
+---
+
+### Issue: VM Cleanup Failed
+
+**Symptom**: VMs or disk images remain after test completion
+
+**Cause**: Test script interrupted or cleanup error
+
+**Solution**:
+
+```bash
+# List all VMs (including powered off)
+sudo virsh list --all
+
+# Force destroy any test VMs
+for vm in $(sudo virsh list --all --name | grep vps-test); do
+  echo "Destroying VM: $vm"
+  sudo virsh destroy "$vm" 2>/dev/null || true
+  sudo virsh undefine "$vm" --remove-all-storage 2>/dev/null || true
+done
+
+# Clean up overlay images
+sudo find /tmp -name "vps-test-*.qcow2" -delete
+sudo find /tmp -name "vps-test-*.iso" -delete
+
+# Clean up old snapshots
+sudo virsh snapshot-list debian-13-base --tree
+sudo virsh snapshot-delete debian-13-base SNAPSHOT_NAME
+
+# Verify cleanup
+sudo virsh list --all
+# Should show only debian-13-base or empty
+```
+
+---
+
+### Issue: Slow KVM Test Performance
+
+**Symptom**: Test takes >25 minutes instead of ~18 minutes
+
+**Cause**: Nested virtualization, insufficient resources, or slow disk
+
+**Diagnosis**:
+
+```bash
+# Check if running in VM (nested virtualization)
+sudo systemd-detect-virt
+# Output: none (bare metal) or kvm/vmware (nested)
+
+# Check available resources
+free -h  # Memory
+nproc    # CPUs
+df -h /var/lib/libvirt/images  # Disk space
+
+# Check disk I/O performance
+sudo hdparm -t /dev/sda  # Replace with your disk
+```
+
+**Solutions**:
+
+```bash
+# 1. Enable nested KVM (if on VM)
+echo "options kvm_intel nested=1" | sudo tee /etc/modprobe.d/kvm-intel.conf
+sudo modprobe -r kvm_intel && sudo modprobe kvm_intel
+
+# 2. Move images to faster disk (SSD)
+sudo systemctl stop libvirtd
+sudo mv /var/lib/libvirt/images /path/to/ssd/
+sudo ln -s /path/to/ssd/images /var/lib/libvirt/images
+sudo systemctl start libvirtd
+
+# 3. Allocate more VM resources
+# Edit: tests/e2e/lib/kvm-helpers.sh
+# Increase: --memory 8192 --vcpu 4
+
+# 4. Use CPU performance governor
+echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+```
+
+---
+
+### Issue: Packer Build Fails
+
+**Symptom**: Base image build fails with Packer errors
+
+**Cause**: Network issues, insufficient disk space, or Packer bugs
+
+**Solution**:
+
+```bash
+# Check Packer version
+packer version
+# Minimum: 1.8.0
+
+# Enable debug logging
+PACKER_LOG=1 cd tests/e2e/packer && ./build-base-image.sh
+
+# Check disk space
+df -h /var/lib/libvirt/images
+# Need: ~30GB free
+
+# Test network connectivity
+wget -O /dev/null http://deb.debian.org/debian/dists/bookworm/Release
+
+# Retry with clean state
+cd tests/e2e/packer
+rm -f packer_cache/*
+sudo rm -f /var/lib/libvirt/images/debian-13-base*
+./build-base-image.sh
+```
+
+**Alternative**: Manual base image creation (see [docs/testing-isolation-kvm.md](testing-isolation-kvm.md))
+
+---
+
+### Issue: SSH Connection Refused to VM
+
+**Symptom**: Cannot SSH to test VM
+
+**Cause**: SSH not started, wrong IP, or firewall blocking
+
+**Solution**:
+
+```bash
+# Get VM IP address
+VM_NAME="vps-test-12345"  # Replace with actual VM name
+sudo virsh domifaddr "$VM_NAME"
+
+# Check if VM is running
+sudo virsh list --all
+
+# Connect to VM console (no network needed)
+sudo virsh console "$VM_NAME"
+# Press Ctrl+] to exit
+
+# Check SSH service in VM
+sudo virsh console "$VM_NAME"
+# Login as testuser
+systemctl status ssh
+ss -tlnp | grep 22
+
+# Test SSH from host
+VM_IP=$(sudo virsh domifaddr "$VM_NAME" | awk '/ipv4/{print $4}' | cut -d'/' -f1)
+ssh -v testuser@$VM_IP
+```
+
+---
+
+### Issue: Snapshot Creation Failed
+
+**Symptom**: Error creating or restoring VM snapshots
+
+**Cause**: Insufficient disk space or corrupted snapshot metadata
+
+**Solution**:
+
+```bash
+# Check available disk space
+df -h /var/lib/libvirt/images
+
+# List existing snapshots
+sudo virsh snapshot-list "$VM_NAME" --tree
+
+# Delete old/corrupted snapshots
+sudo virsh snapshot-delete "$VM_NAME" SNAPSHOT_NAME
+
+# Try external snapshot (uses less space)
+sudo virsh snapshot-create-as "$VM_NAME" SNAPSHOT_NAME \
+    --disk-only \
+    --diskspec vda,file=/tmp/snapshot.qcow2
+
+# Clean up snapshot metadata if corrupted
+sudo rm -f /var/lib/libvirt/qemu/snapshot/"$VM_NAME"/*.xml
+```
+
+---
+
+For more KVM testing details, see [docs/testing-isolation-kvm.md](testing-isolation-kvm.md).
 
 ---
 

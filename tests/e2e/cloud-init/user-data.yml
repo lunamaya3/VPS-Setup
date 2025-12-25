@@ -1,0 +1,90 @@
+#cloud-config
+# Cloud-init user data configuration for VPS provisioning test VM
+
+hostname: test-vps
+fqdn: test-vps.local
+manage_etc_hosts: true
+
+# Create test user with passwordless sudo
+users:
+  - name: testuser
+    groups: sudo, libvirt
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    lock_passwd: false
+    # Password: testpass (hashed with mkpasswd -m sha-512)
+    passwd: $6$rounds=4096$saltsaltsal$L3kj8sHXqK7VH8cF5Q.xBvH9z8QBcXeKzOkJKL7mNpD0vN1qRGxO2pLwH3mZ0YvKxN8qL7mNpD0vN1qRGxO2p
+    ssh_authorized_keys:
+      - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7Z8qL5m3XYvH8cF5Q+xBvH9z8QBcXeKzOkJKL7mNpD0vN1qRGxO2pLwH3mZ0YvKxN8qL7mNpD0vN1qRGxO2p test-vm-key
+
+# Network configuration (DHCP)
+network:
+  version: 2
+  ethernets:
+    ens3:
+      dhcp4: true
+      dhcp6: false
+
+# Package management
+package_update: true
+package_upgrade: true
+package_reboot_if_required: false
+
+# Install essential packages for testing
+packages:
+  - build-essential
+  - git
+  - curl
+  - wget
+  - vim
+  - tmux
+  - htop
+  - net-tools
+  - dnsutils
+  - rsync
+
+# Configure SSH server
+ssh_pwauth: true
+disable_root: true
+
+# Run commands on first boot
+runcmd:
+  - echo "Cloud-init provisioning complete"
+  - systemctl enable ssh
+  - systemctl start ssh
+  -  # Pre-create log directory for vps-provision
+  - mkdir -p /var/log/vps-provision
+  - chown testuser:testuser /var/log/vps-provision
+  -  # Create provisioning directory
+  - mkdir -p /var/vps-provision/checkpoints
+  - chown -R testuser:testuser /var/vps-provision
+
+# Write files
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-test-vm.conf
+    content: |
+      # SSH configuration for test VM
+      PermitRootLogin no
+      PasswordAuthentication yes
+      PubkeyAuthentication yes
+      UseDNS no
+    permissions: "0644"
+
+  - path: /home/testuser/.ssh/config
+    content: |
+      # SSH client configuration
+      Host *
+        StrictHostKeyChecking no
+        UserKnownHostsFile=/dev/null
+    owner: testuser:testuser
+    permissions: "0600"
+
+# Set timezone
+timezone: UTC
+
+# Final message
+final_message: |
+  VPS Test VM provisioned successfully via cloud-init
+  System is ready for provisioning tests
+  Hostname: $HOSTNAME
+  Uptime: $UPTIME

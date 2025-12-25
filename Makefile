@@ -143,6 +143,105 @@ test-e2e: ## Run end-to-end tests (requires VPS)
 		echo "No E2E tests found in $(TEST_E2E_DIR)"; \
 	fi
 
+test-e2e-isolated: ## Run E2E tests in isolated Docker container (SAFE for host system)
+	@printf "$(COLOR_YELLOW)Running E2E tests in isolated container...$(COLOR_RESET)\n"
+	@printf "$(COLOR_GREEN)✓ Safe: Uses Docker isolation, no host system changes$(COLOR_RESET)\n"
+	@if [ ! -f "$(TEST_E2E_DIR)/run-isolated-test.sh" ]; then \
+		printf "$(COLOR_YELLOW)Isolated test runner not found at $(TEST_E2E_DIR)/run-isolated-test.sh$(COLOR_RESET)\n"; \
+		exit 1; \
+	fi
+	@bash $(TEST_E2E_DIR)/run-isolated-test.sh
+
+test-e2e-isolated-build: ## Build isolated test environment image
+	@printf "$(COLOR_YELLOW)Building isolated test environment...$(COLOR_RESET)\n"
+	@if ! command -v docker &> /dev/null; then \
+		printf "$(COLOR_YELLOW)Docker not installed. Install Docker and retry.$(COLOR_RESET)\n"; \
+		exit 1; \
+	fi
+	@docker build -t vps-provision-test -f $(TEST_E2E_DIR)/Dockerfile.test .
+	@printf "$(COLOR_GREEN)✓ Test image built: vps-provision-test$(COLOR_RESET)\n"
+
+test-e2e-isolated-rebuild: ## Rebuild and run isolated E2E tests
+	@printf "$(COLOR_YELLOW)Rebuilding and running isolated E2E tests...$(COLOR_RESET)\n"
+	@REBUILD=true bash $(TEST_E2E_DIR)/run-isolated-test.sh
+
+test-e2e-kvm: check-kvm-prerequisites ## Run E2E tests in KVM virtual machine (requires base image)
+	@printf "$(COLOR_YELLOW)Running E2E tests in KVM VM...$(COLOR_RESET)\n"
+	@printf "$(COLOR_GREEN)✓ Full hardware virtualization with snapshot isolation$(COLOR_RESET)\n"
+	@if [ ! -f "$(TEST_E2E_DIR)/run-kvm-test.sh" ]; then \
+		printf "$(COLOR_YELLOW)KVM test runner not found at $(TEST_E2E_DIR)/run-kvm-test.sh$(COLOR_RESET)\n"; \
+		exit 1; \
+	fi
+	@bash $(TEST_E2E_DIR)/run-kvm-test.sh
+
+check-kvm-prerequisites: ## Check KVM virtualization prerequisites
+	@printf "$(COLOR_YELLOW)Checking KVM prerequisites...$(COLOR_RESET)\n"
+	@error_count=0; \
+	\
+	if [ ! -e /dev/kvm ]; then \
+		printf "$(COLOR_YELLOW)✗ /dev/kvm not found - KVM not available$(COLOR_RESET)\n"; \
+		printf "  Check: lsmod | grep kvm\n"; \
+		error_count=$$((error_count + 1)); \
+	else \
+		printf "$(COLOR_GREEN)✓ KVM available at /dev/kvm$(COLOR_RESET)\n"; \
+	fi; \
+	\
+	if ! command -v virsh &> /dev/null; then \
+		printf "$(COLOR_YELLOW)✗ virsh not found$(COLOR_RESET)\n"; \
+		printf "  Install: sudo apt-get install libvirt-clients libvirt-daemon-system$(COLOR_RESET)\n"; \
+		error_count=$$((error_count + 1)); \
+	else \
+		printf "$(COLOR_GREEN)✓ virsh installed$(COLOR_RESET)\n"; \
+	fi; \
+	\
+	if ! command -v qemu-img &> /dev/null; then \
+		printf "$(COLOR_YELLOW)✗ qemu-img not found$(COLOR_RESET)\n"; \
+		printf "  Install: sudo apt-get install qemu-utils$(COLOR_RESET)\n"; \
+		error_count=$$((error_count + 1)); \
+	else \
+		printf "$(COLOR_GREEN)✓ qemu-img installed$(COLOR_RESET)\n"; \
+	fi; \
+	\
+	if ! command -v virt-install &> /dev/null; then \
+		printf "$(COLOR_YELLOW)✗ virt-install not found$(COLOR_RESET)\n"; \
+		printf "  Install: sudo apt-get install virtinst$(COLOR_RESET)\n"; \
+		error_count=$$((error_count + 1)); \
+	else \
+		printf "$(COLOR_GREEN)✓ virt-install installed$(COLOR_RESET)\n"; \
+	fi; \
+	\
+	if ! groups | grep -q libvirt; then \
+		printf "$(COLOR_YELLOW)✗ Current user not in libvirt group$(COLOR_RESET)\n"; \
+		printf "  Fix: sudo usermod -aG libvirt $$USER && newgrp libvirt$(COLOR_RESET)\n"; \
+		error_count=$$((error_count + 1)); \
+	else \
+		printf "$(COLOR_GREEN)✓ User in libvirt group$(COLOR_RESET)\n"; \
+	fi; \
+	\
+	base_image="/var/lib/libvirt/images/debian-13-base"; \
+	if [ ! -f "$$base_image" ]; then \
+		printf "$(COLOR_YELLOW)✗ Base image not found: $$base_image$(COLOR_RESET)\n"; \
+		printf "  Build: tests/e2e/packer/build-base-image.sh$(COLOR_RESET)\n"; \
+		error_count=$$((error_count + 1)); \
+	else \
+		printf "$(COLOR_GREEN)✓ Base image exists$(COLOR_RESET)\n"; \
+	fi; \
+	\
+	if systemctl is-active --quiet libvirtd; then \
+		printf "$(COLOR_GREEN)✓ libvirtd service running$(COLOR_RESET)\n"; \
+	else \
+		printf "$(COLOR_YELLOW)✗ libvirtd service not running$(COLOR_RESET)\n"; \
+		printf "  Start: sudo systemctl start libvirtd$(COLOR_RESET)\n"; \
+		error_count=$$((error_count + 1)); \
+	fi; \
+	\
+	if [ $$error_count -gt 0 ]; then \
+		printf "\n$(COLOR_YELLOW)Found $$error_count prerequisite issue(s)$(COLOR_RESET)\n"; \
+		exit 1; \
+	else \
+		printf "\n$(COLOR_GREEN)✓ All KVM prerequisites satisfied$(COLOR_RESET)\n"; \
+	fi
+
 lint-shell: ## Lint shell scripts with shellcheck (cached)
 	@printf "$(COLOR_YELLOW)[1/8] ShellCheck linting...$(COLOR_RESET) "
 	@if command -v shellcheck &> /dev/null; then \
@@ -293,7 +392,15 @@ clean: clean-cache ## Clean temporary files, logs, and cache
 	@if [ -d "$(LOG_DIR)" ]; then \
 		sudo rm -rf $(LOG_DIR)/*; \
 	fi
+	@printf "$(COLOR_YELLOW)Cleaning Docker test containers...$(COLOR_RESET)\n"
+	@docker ps -a --filter "name=vps-test-" -q 2>/dev/null | xargs -r docker rm -f 2>/dev/null || true
 	@printf "$(COLOR_GREEN)✓ Cleanup complete!$(COLOR_RESET)\n"
+
+clean-docker: ## Clean Docker test artifacts (containers and images)
+	@printf "$(COLOR_YELLOW)Cleaning Docker test artifacts...$(COLOR_RESET)\n"
+	@docker ps -a --filter "name=vps-test-" -q 2>/dev/null | xargs -r docker rm -f 2>/dev/null || true
+	@docker images -q vps-provision-test 2>/dev/null | xargs -r docker rmi -f 2>/dev/null || true
+	@printf "$(COLOR_GREEN)✓ Docker artifacts cleaned!$(COLOR_RESET)\n"
 
 clean-all: clean ## Clean everything including installed dependencies
 	@printf "$(COLOR_YELLOW)Cleaning all artifacts...$(COLOR_RESET)\n"

@@ -1,0 +1,219 @@
+name: KVM E2E Tests
+
+# Triggers: Manual dispatch, weekly schedule, release branches
+on:
+  workflow_dispatch:
+    inputs:
+      base_image_rebuild:
+        description: "Rebuild base image from scratch"
+        required: false
+        default: "false"
+        type: boolean
+      test_timeout:
+        description: "Test timeout in seconds"
+        required: false
+        default: "1800"
+        type: string
+
+  schedule:
+    # Run every Monday at 2:00 AM UTC
+    - cron: "0 2 * * 1"
+
+  push:
+    branches:
+      - "release/**"
+      - "hotfix/**"
+
+# Concurrency: Cancel in-progress runs for same branch
+concurrency:
+  group: kvm-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kvm-e2e-test:
+    name: KVM E2E Test Suite
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enable KVM support
+        run: |
+          echo "Checking KVM availability..."
+
+          # Check if KVM device exists
+          if [ ! -e /dev/kvm ]; then
+            echo "❌ KVM not available on this runner"
+            echo "Note: GitHub-hosted runners do not support nested virtualization"
+            echo "Consider using self-hosted runners with KVM support"
+            exit 1
+          fi
+
+          # Verify KVM kernel modules
+          lsmod | grep kvm || {
+            echo "❌ KVM kernel modules not loaded"
+            exit 1
+          }
+
+          echo "✓ KVM available: $(ls -la /dev/kvm)"
+
+      - name: Install libvirt and dependencies
+        run: |
+          echo "Installing KVM/libvirt packages..."
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            qemu-kvm \
+            libvirt-daemon-system \
+            libvirt-clients \
+            virtinst \
+            qemu-utils \
+            genisoimage \
+            cloud-init \
+            rsync
+
+          # Add runner user to libvirt group
+          sudo usermod -aG libvirt $USER
+
+          # Start libvirt daemon
+          sudo systemctl start libvirtd
+          sudo systemctl status libvirtd --no-pager
+
+          # Verify installation
+          virsh version
+          qemu-img --version
+
+      - name: Configure libvirt networking
+        run: |
+          echo "Configuring libvirt default network..."
+
+          # Start default network
+          sudo virsh net-start default || echo "Network already started"
+          sudo virsh net-autostart default
+
+          # Verify network
+          sudo virsh net-list --all
+          sudo virsh net-info default
+
+      - name: Cache base image
+        id: cache-base-image
+        uses: actions/cache@v3
+        with:
+          path: /var/lib/libvirt/images/debian-13-base
+          key: debian-13-base-${{ hashFiles('tests/e2e/packer/debian-13-base.pkr.hcl', 'tests/e2e/packer/preseed.cfg') }}
+          restore-keys: |
+            debian-13-base-
+
+      - name: Build base image
+        if: steps.cache-base-image.outputs.cache-hit != 'true' || github.event.inputs.base_image_rebuild == 'true'
+        run: |
+          echo "Building Debian 13 base image with Packer..."
+
+          # Install Packer
+          wget -q https://releases.hashicorp.com/packer/1.10.0/packer_1.10.0_linux_amd64.zip
+          unzip -q packer_1.10.0_linux_amd64.zip
+          sudo mv packer /usr/local/bin/
+          packer version
+
+          # Build base image
+          cd tests/e2e/packer
+          chmod +x build-base-image.sh
+          sudo ./build-base-image.sh
+
+          # Verify image created
+          sudo ls -lh /var/lib/libvirt/images/debian-13-base
+
+      - name: Verify base image exists
+        run: |
+          if [ ! -f /var/lib/libvirt/images/debian-13-base ]; then
+            echo "❌ Base image not found"
+            exit 1
+          fi
+          echo "✓ Base image exists: $(sudo ls -lh /var/lib/libvirt/images/debian-13-base)"
+
+      - name: Run KVM E2E tests
+        timeout-minutes: 35
+        env:
+          TEST_TIMEOUT: ${{ github.event.inputs.test_timeout || '1800' }}
+        run: |
+          echo "Running KVM E2E tests..."
+          echo "Test timeout: ${TEST_TIMEOUT}s"
+
+          # Run with sudo to access libvirt
+          sudo -E bash tests/e2e/run-kvm-test.sh
+
+      - name: Collect test artifacts
+        if: always()
+        run: |
+          echo "Collecting test artifacts..."
+
+          # Find test reports
+          sudo find /tmp -name "*-report.md" -type f -exec cp {} . \; || true
+
+          # Collect libvirt logs
+          sudo journalctl -u libvirtd --no-pager > libvirtd.log || true
+
+          # List VMs (should be clean)
+          sudo virsh list --all > vm-list.txt || true
+
+          ls -la *.md *.log *.txt || echo "No artifacts found"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: kvm-e2e-test-report
+          path: |
+            *-report.md
+            libvirtd.log
+            vm-list.txt
+          retention-days: 30
+
+      - name: Cleanup test resources
+        if: always()
+        run: |
+          echo "Cleaning up test resources..."
+
+          # Force destroy any remaining test VMs
+          for vm in $(sudo virsh list --all --name | grep vps-test); do
+            echo "Destroying VM: $vm"
+            sudo virsh destroy "$vm" 2>/dev/null || true
+            sudo virsh undefine "$vm" --remove-all-storage 2>/dev/null || true
+          done
+
+          # Clean up overlay images
+          sudo find /tmp -name "vps-test-*.qcow2" -delete || true
+          sudo find /tmp -name "vps-test-*.iso" -delete || true
+
+          # Final VM list (should be empty)
+          sudo virsh list --all
+
+      - name: Report status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ KVM E2E tests PASSED"
+          else
+            echo "❌ KVM E2E tests FAILED"
+            echo "Check artifacts for detailed test report"
+          fi
+
+  notify-results:
+    name: Notify Test Results
+    needs: kvm-e2e-test
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Workflow conclusion
+        run: |
+          if [ "${{ needs.kvm-e2e-test.result }}" == "success" ]; then
+            echo "✅ KVM E2E Test Suite: PASSED"
+            exit 0
+          else
+            echo "❌ KVM E2E Test Suite: FAILED"
+            exit 1
+          fi

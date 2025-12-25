@@ -4,13 +4,14 @@
 
 ## Quick Links
 
-| Document                                        | Purpose                          | Audience                    |
-| ----------------------------------------------- | -------------------------------- | --------------------------- |
-| **[Quick Start Guide](quickstart.md)**          | Get started in 5 minutes         | New users, first-time setup |
-| **[CLI Usage Guide](cli-usage.md)**             | Complete command-line reference  | All users, daily operations |
-| **[Architecture Guide](architecture.md)**       | System design and components     | Developers, contributors    |
-| **[Security Guide](security.md)**               | Security practices and hardening | Security teams, compliance  |
-| **[Troubleshooting Guide](troubleshooting.md)** | Problem diagnosis and resolution | All users, support teams    |
+| Document                                            | Purpose                          | Audience                    |
+| --------------------------------------------------- | -------------------------------- | --------------------------- |
+| **[Quick Start Guide](quickstart.md)**              | Get started in 5 minutes         | New users, first-time setup |
+| **[CLI Usage Guide](cli-usage.md)**                 | Complete command-line reference  | All users, daily operations |
+| **[Architecture Guide](architecture.md)**           | System design and components     | Developers, contributors    |
+| **[Testing Isolation Guide](testing-isolation.md)** | Safe local testing with Docker   | Developers, contributors    |
+| **[Security Guide](security.md)**                   | Security practices and hardening | Security teams, compliance  |
+| **[Troubleshooting Guide](troubleshooting.md)**     | Problem diagnosis and resolution | All users, support teams    |
 
 ## Documentation Overview
 
@@ -52,7 +53,16 @@ Start here if you're developing or extending the tool:
    - Extensibility points
    - Testing architecture
 
-2. **[Security Guide](security.md)**
+2. **[Testing Isolation Guide](testing-isolation.md)** ⚠️ **Read before testing!**
+
+   - Safe local testing with Docker
+   - Complete environment isolation
+   - Step-by-step setup instructions
+   - Safety checklist and best practices
+   - Troubleshooting test failures
+   - CI/CD integration examples
+
+3. **[Security Guide](security.md)**
    - Security principles and practices
    - Authentication & authorization
    - Network security configuration

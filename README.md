@@ -469,12 +469,58 @@ This project uses **Git hooks** for automated quality checks:
 The project uses a **comprehensive 4-tier testing pyramid**:
 
 ```bash
-make test              # All tests (unit + integration + contract + Python)
-make test-unit         # 178 unit tests (5-10s, no VPS needed)
-make test-integration  # Integration tests (1-2m, requires sudo)
-make test-contract     # CLI interface contract tests (10-20s)
-make test-e2e          # Full provisioning test (15m, fresh VPS required)
+make test                 # All tests (unit + integration + contract + Python)
+make test-unit            # 178 unit tests (5-10s, no VPS needed)
+make test-integration     # Integration tests (1-2m, requires sudo)
+make test-contract        # CLI interface contract tests (10-20s)
+make test-e2e             # Full provisioning test (15m, fresh VPS required)
+make test-e2e-isolated    # ⭐ E2E tests in Docker (SAFE for host system)
 ```
+
+**⚠️ Testing Safety**: Standard E2E tests (`make test-e2e`) modify system state and can corrupt your host system. For safe local testing, use isolated testing options:
+
+- **Docker Isolation** (fastest): `make test-e2e-isolated` - Runs in Docker containers with complete isolation
+- **KVM Isolation** (highest fidelity): `make test-e2e-kvm` - Full VM testing matching actual VPS deployment
+
+See [docs/testing-isolation.md](docs/testing-isolation.md) for Docker testing and [docs/testing-isolation-kvm.md](docs/testing-isolation-kvm.md) for KVM testing guide.
+
+#### KVM Virtualization Testing
+
+For maximum test fidelity and hardware-level isolation, use KVM testing:
+
+```bash
+# One-time setup: Build base image (~15 minutes)
+cd tests/e2e/packer
+./build-base-image.sh
+
+# Check prerequisites
+make check-kvm-prerequisites
+
+# Run KVM E2E tests (~18 minutes)
+make test-e2e-kvm
+```
+
+**Why KVM Testing?**
+
+- ✅ **Highest Fidelity**: Matches actual VPS deployment exactly (full VM, separate kernel)
+- ✅ **Complete Isolation**: No shared kernel, independent network stack
+- ✅ **Native Systemd**: Full init system without Docker's privileged mode
+- ✅ **Desktop Environment**: Complete X11/XFCE without quirks
+- ✅ **Snapshot-Based**: Fast rollback and reproducible test states
+
+**Trade-offs vs Docker**:
+
+| Aspect           | Docker  | KVM     |
+| ---------------- | ------- | ------- |
+| Startup Time     | 5-10s   | 30-60s  |
+| Total Duration   | ~14 min | ~18 min |
+| Resource Usage   | ~2GB    | ~5GB    |
+| Test Fidelity    | High    | Highest |
+| Setup Complexity | Low     | Medium  |
+
+**Recommendation**: Use Docker for quick iteration and CI/CD. Use KVM for weekly validation and pre-release testing.
+
+For complete KVM testing guide, prerequisites, troubleshooting, and performance tuning, see [docs/testing-isolation-kvm.md](docs/testing-isolation-kvm.md).
 
 #### Test Structure
 

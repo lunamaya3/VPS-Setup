@@ -1,0 +1,3 @@
+# Cloud-init metadata configuration
+instance-id: vps-test-instance
+local-hostname: test-vps
