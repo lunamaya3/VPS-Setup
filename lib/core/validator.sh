@@ -144,15 +144,26 @@ validator_check_network() {
   local connected=false
 
   for host in "${test_hosts[@]}"; do
-    if ping -c 1 -W 2 "$host" &>/dev/null; then
+    # Try ping with strict timeout (1 second, 1 packet)
+    if timeout 3 ping -c 1 -W 1 "$host" &>/dev/null; then
       log_info "Network check passed: reachable $host"
       connected=true
       break
+    fi
+    
+    # Fallback: try curl if ping fails
+    if command -v curl &>/dev/null; then
+      if timeout 3 curl -s --connect-timeout 2 "http://$host" &>/dev/null; then
+        log_info "Network check passed: reachable $host (via curl)"
+        connected=true
+        break
+      fi
     fi
   done
 
   if [[ "$connected" == "false" ]]; then
     log_error "Network connectivity check failed"
+    log_error "Unable to reach 8.8.8.8 or 1.1.1.1"
     VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
     return 1
   fi
