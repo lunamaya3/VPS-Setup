@@ -177,10 +177,20 @@ rdp_server_generate_certificates() {
     return 1
   fi
 
-  # Set proper permissions
+  # Set proper permissions (must be done AFTER openssl creates the files)
   chmod 600 "${KEY_FILE}"
   chmod 644 "${CERT_FILE}"
+  
+  # Set ownership (chown doesn't change permissions in this case)
   chown xrdp:xrdp "${KEY_FILE}" "${CERT_FILE}"
+  
+  # Verify permissions were set correctly
+  local key_perms
+  key_perms=$(stat -c "%a" "${KEY_FILE}")
+  if [[ "${key_perms}" != "600" ]]; then
+    log_warning "Key permissions were ${key_perms}, fixing to 600"
+    chmod 600 "${KEY_FILE}"
+  fi
 
   transaction_log "rm -f ${CERT_FILE} ${KEY_FILE}"
 
