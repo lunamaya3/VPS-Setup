@@ -34,13 +34,11 @@ teardown() {
 }
 
 @test "validator_check_os detects missing /etc/os-release" {
-  # Mock /etc/os-release as missing
-  function source() {
-    if [[ "$1" == "/etc/os-release" ]]; then
-      return 1
-    fi
+  # Mock grep to simulate missing file
+  function grep() {
+    return 1
   }
-  export -f source
+  export -f grep
   
   validator_init
   validator_check_os || true
@@ -129,11 +127,26 @@ teardown() {
 }
 
 @test "validator_check_network fails with unreachable hosts" {
-  # Mock ping to fail
+  # Mock timeout, ping, and curl to all fail
+  function timeout() {
+    return 1
+  }
   function ping() {
     return 1
   }
+  function curl() {
+    return 1
+  }
+  function command() {
+    if [[ "$1" == "-v" && "$2" == "curl" ]]; then
+      return 0  # curl exists
+    fi
+    return 1
+  }
+  export -f timeout
   export -f ping
+  export -f curl
+  export -f command
   
   validator_init
   validator_check_network || true
