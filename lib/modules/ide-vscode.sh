@@ -21,6 +21,7 @@ readonly VSCODE_CHECKPOINT="${VSCODE_CHECKPOINT:-ide-vscode}"
 readonly VSCODE_GPG_URL="https://packages.microsoft.com/keys/microsoft.asc"
 readonly VSCODE_REPO="deb [arch=amd64] https://packages.microsoft.com/repos/code stable main"
 readonly VSCODE_LIST="${VSCODE_LIST:-/etc/apt/sources.list.d/vscode.list}"
+readonly VSCODE_SOURCES="/etc/apt/sources.list.d/vscode.sources"
 readonly VSCODE_GPG_KEY="${VSCODE_GPG_KEY:-/etc/apt/trusted.gpg.d/microsoft.gpg}"
 readonly VSCODE_DESKTOP="${VSCODE_DESKTOP:-/usr/share/applications/code.desktop}"
 
@@ -107,7 +108,14 @@ ide_vscode_add_gpg_key() {
 ide_vscode_add_repository() {
   log_info "Adding VSCode repository..."
 
-  # Check if repository already exists
+  # Remove duplicate repository files if they exist
+  # VSCode .deb package will create its own vscode.sources file
+  if [[ -f "$VSCODE_SOURCES" ]]; then
+    log_info "Removing existing vscode.sources (will be recreated by package)"
+    rm -f "$VSCODE_SOURCES"
+  fi
+
+  # Check if our repository file already exists
   if [[ -f "$VSCODE_LIST" ]]; then
     log_info "VSCode repository already configured"
     return 0
@@ -209,6 +217,13 @@ ide_vscode_install_package() {
   if ! ide_vscode_verify_signature; then
     log_error "GPG signature verification failed for VSCode package"
     return 1
+  fi
+
+  # Clean up duplicate repository file created by .deb package
+  # VSCode .deb creates vscode.sources but we already have vscode.list
+  if [[ -f "$VSCODE_SOURCES" && -f "$VSCODE_LIST" ]]; then
+    log_info "Removing duplicate vscode.sources (keeping vscode.list)"
+    rm -f "$VSCODE_SOURCES"
   fi
 
   return 0
