@@ -382,8 +382,16 @@ state_save_session() {
     log_error "No active session"
     return 1
   fi
-  
-  # State is already persisted by update functions
+
+  local updated_json
+  updated_json=$(cat "${CURRENT_SESSION_FILE}")
+
+  if [[ -n "${SESSION_STATUS:-}" ]]; then
+    updated_json=$(echo "${updated_json}" | jq --arg status "${SESSION_STATUS}" '.status = $status')
+  fi
+
+  echo "${updated_json}" > "${CURRENT_SESSION_FILE}"
+
   log_debug "Session state saved: ${CURRENT_SESSION_ID}"
   return 0
 }

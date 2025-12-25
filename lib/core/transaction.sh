@@ -112,9 +112,11 @@ transaction_get_rollback_commands() {
   if [[ ! -f "$TRANSACTION_LOG" ]]; then
     return 0
   fi
-  
+
   # Read transactions in reverse order and extract rollback commands
-  tac "$TRANSACTION_LOG" | cut -d'|' -f3
+  while IFS='|' read -r _ _ rollback_cmd; do
+    echo "$rollback_cmd"
+  done < <(tac "$TRANSACTION_LOG")
 }
 
 # Clear transaction log

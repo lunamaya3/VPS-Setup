@@ -83,7 +83,8 @@ teardown() {
   transaction_record "Failed operation" "exit 1"
   transaction_record "Created file2" "rm -f ${TEST_DIR}/file2"
   
-  rollback_execute
+  run rollback_execute
+  assert_failure
   
   # file1 and file2 should still be removed despite middle failure
   [[ ! -f "${TEST_DIR}/file1" ]]
@@ -223,7 +224,7 @@ teardown() {
   transaction_record "Will fail" "exit 1"
   transaction_record "Will also fail" "exit 1"
   
-  rollback_execute
+  rollback_execute || true
   
   [[ $ROLLBACK_ERRORS -eq 2 ]]
 }
@@ -279,7 +280,7 @@ teardown() {
   transaction_record "Action 1" "rollback1"
   transaction_record "Action 2" "rollback2"
   
-  rollback_execute
+  run rollback_execute
   
   stats=$(rollback_get_stats)
   

@@ -2,7 +2,7 @@
 # config.sh - Configuration management for VPS provisioning
 # Reads config files, validates values, provides config access functions
 
-set -euo pipefail
+set -eo pipefail
 
 # Prevent multiple sourcing
 if [[ -n "${_CONFIG_SH_LOADED:-}" ]]; then
@@ -29,7 +29,7 @@ if [[ -z "${PROJECT_CONFIG:-}" ]]; then
 fi
 
 # Configuration variables (will be populated from config files)
-declare -A CONFIG
+declare -gA CONFIG
 
 # Initialize configuration system
 # Loads configuration from files in priority order
@@ -123,11 +123,7 @@ config_get() {
   local key="$1"
   local default="${2:-}"
   
-  if [[ -n "${CONFIG[$key]:-}" ]]; then
-    echo "${CONFIG[$key]}"
-  else
-    echo "$default"
-  fi
+  printf '%s\n' "${CONFIG[$key]-$default}"
 }
 
 # Set configuration value
@@ -154,7 +150,7 @@ config_set() {
 config_has() {
   local key="$1"
   
-  if [[ -n "${CONFIG[$key]:-}" ]]; then
+  if [[ ${CONFIG[$key]+_} ]]; then
     return 0
   fi
   

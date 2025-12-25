@@ -2,7 +2,7 @@
 # logger.sh - Logging framework for VPS provisioning
 # Provides structured logging with levels, colors, and file output
 
-set -euo pipefail
+set -eo pipefail
 
 # Prevent multiple sourcing
 if [[ -n "${_LOGGER_SH_LOADED:-}" ]]; then
@@ -11,9 +11,9 @@ fi
 readonly _LOGGER_SH_LOADED=1
 
 # Global variables
-readonly LOG_DIR="${LOG_DIR:-/var/log/vps-provision}"
-readonly LOG_FILE="${LOG_FILE:-${LOG_DIR}/provision.log}"
-readonly TRANSACTION_LOG="${TRANSACTION_LOG:-${LOG_DIR}/transactions.log}"
+LOG_DIR="${LOG_DIR:-/var/log/vps-provision}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/provision.log}"
+TRANSACTION_LOG="${TRANSACTION_LOG:-${LOG_DIR}/transactions.log}"
 
 # Log levels
 readonly LOG_LEVEL_DEBUG=0

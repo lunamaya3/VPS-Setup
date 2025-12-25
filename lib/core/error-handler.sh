@@ -51,7 +51,7 @@ readonly -a EXIT_CODE_WHITELIST=(
 
 # Error suggestion mappings (UX-008: actionable suggestions)
 readonly -A ERROR_SUGGESTIONS=(
-  ["$E_NETWORK"]="Check internet connection and DNS resolution. Verify firewall rules."
+  ["$E_NETWORK"]="Check network connectivity, internet access, and DNS resolution. Verify firewall rules."
   ["$E_DISK"]="Free up disk space by removing unnecessary files or expanding storage."
   ["$E_LOCK"]="Wait a moment and retry. Another package manager may be running."
   ["$E_PKG_CORRUPT"]="Clear package cache with 'apt-get clean' and retry installation."
@@ -77,9 +77,16 @@ error_classify() {
   local stdout="${3:-}"
   local combined="${stderr} ${stdout}"
   
+  # Timeout errors
+  if [[ "$exit_code" -eq 124 ]] || \
+     echo "$combined" | grep -qiE "(timeout|timed out)"; then
+    echo "$E_TIMEOUT"
+    return 0
+  fi
+  
   # Network-related errors
   if [[ "$exit_code" -eq 100 ]] || \
-     echo "$combined" | grep -qiE "(connection.*refused|timed out|network.*unreachable|could not resolve|failed to fetch)"; then
+     echo "$combined" | grep -qiE "(connection.*refused|network.*unreachable|could not resolve|failed to fetch)"; then
     echo "$E_NETWORK"
     return 0
   fi
@@ -243,19 +250,24 @@ execute_with_retry() {
     local output
     local stderr
     local exit_code
+    local _output_file
+    _output_file="$(mktemp)"
     
-    # Execute command and capture output
-    if output=$(eval "$cmd" 2>&1); then
+    # Execute command and capture output without losing shell state
+    if eval "$cmd" >"$_output_file" 2>&1; then
       exit_code=0
     else
       exit_code=$?
     fi
     
+    output="$(cat "$_output_file")"
+    rm -f "$_output_file"
     stderr="$output"
     
     # Check if exit code is acceptable
     if error_exit_code_whitelisted "$exit_code"; then
       log_info "Command succeeded"
+      [[ -n "$output" ]] && echo "$output"
       return 0
     fi
     
@@ -269,7 +281,7 @@ execute_with_retry() {
     log_warning "Command failed with error type: $error_type (severity: $severity)"
     
     # Critical errors should not be retried
-    if [[ "$severity" == "$E_SEVERITY_CRITICAL" ]]; then
+    if [[ "$severity" == "$E_SEVERITY_CRITICAL" || "$severity" == "FATAL" ]]; then
       log_error "Critical error detected, aborting retries"
       circuit_breaker_record_failure
       return 1
@@ -341,12 +353,17 @@ execute_with_circuit_breaker() {
   
   local output
   local exit_code
+  local _output_file
+  _output_file="$(mktemp)"
   
-  if output=$(eval "$cmd" 2>&1); then
+  if eval "$cmd" >"$_output_file" 2>&1; then
     exit_code=0
   else
     exit_code=$?
   fi
+  
+  output="$(cat "$_output_file")"
+  rm -f "$_output_file"
   
   if error_exit_code_whitelisted "$exit_code"; then
     return 0
@@ -390,4 +407,3 @@ safe_execute() {
   log_error "$description failed after $max_retries attempts"
   return 1
 }
-
