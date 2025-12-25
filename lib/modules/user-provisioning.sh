@@ -356,13 +356,21 @@ user_provisioning_generate_password() {
 
   rm -f "${stderr_output}"
 
-  # SEC-003: Set password WITHOUT logging it (use 2>&1 redirection to /dev/null for chpasswd)
-  # We only log success/failure, never the actual password
-  if ! echo "${username}:${password}" | chpasswd 2>&1 | grep -v "password" | tee -a "${LOG_FILE}" >/dev/null; then
-    log_error "Failed to set password for ${username} (chpasswd failed)"
+  # SEC-003: Set password WITHOUT logging it
+  # Capture stderr separately to check for errors without exposing password
+  local chpasswd_output
+  chpasswd_output=$(mktemp)
+  
+  if ! echo "${username}:${password}" | chpasswd 2>"${chpasswd_output}"; then
+    # Show error but don't expose password in logs
+    local error_msg
+    error_msg=$(cat "${chpasswd_output}" | grep -v "password" | head -1)
+    log_error "Failed to set password for ${username}: ${error_msg:-unknown error}"
+    rm -f "${chpasswd_output}"
     return 1
   fi
-
+  
+  rm -f "${chpasswd_output}"
   log_info "Password set successfully for ${username} (password: [REDACTED])"
 
   # SEC-004: Force password change on first login per requirement
