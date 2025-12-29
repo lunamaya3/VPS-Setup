@@ -145,25 +145,41 @@ test-e2e: ## Run end-to-end tests (requires VPS)
 
 test-e2e-isolated: ## Run E2E tests in isolated Docker container (SAFE for host system)
 	@printf "$(COLOR_YELLOW)Running E2E tests in isolated container...$(COLOR_RESET)\n"
-	@printf "$(COLOR_GREEN)✓ Safe: Uses Docker isolation, no host system changes$(COLOR_RESET)\n"
+	@printf "$(COLOR_GREEN)✓ Safe: Docker isolation with security hardening$(COLOR_RESET)\n"
+	@printf "$(COLOR_GREEN)✓ Read-only mounts, resource limits, minimal privileges$(COLOR_RESET)\n"
 	@if [ ! -f "$(TEST_E2E_DIR)/run-isolated-test.sh" ]; then \
 		printf "$(COLOR_YELLOW)Isolated test runner not found at $(TEST_E2E_DIR)/run-isolated-test.sh$(COLOR_RESET)\n"; \
 		exit 1; \
 	fi
 	@bash $(TEST_E2E_DIR)/run-isolated-test.sh
 
-test-e2e-isolated-build: ## Build isolated test environment image
-	@printf "$(COLOR_YELLOW)Building isolated test environment...$(COLOR_RESET)\n"
+test-e2e-isolated-build: ## Build isolated test environment image with BuildKit
+	@printf "$(COLOR_YELLOW)Building isolated test environment with BuildKit...$(COLOR_RESET)\n"
 	@if ! command -v docker &> /dev/null; then \
 		printf "$(COLOR_YELLOW)Docker not installed. Install Docker and retry.$(COLOR_RESET)\n"; \
 		exit 1; \
 	fi
-	@docker build -t vps-provision-test -f $(TEST_E2E_DIR)/Dockerfile.test .
-	@printf "$(COLOR_GREEN)✓ Test image built: vps-provision-test$(COLOR_RESET)\n"
+	@export DOCKER_BUILDKIT=1; \
+	docker build \
+		--file $(TEST_E2E_DIR)/Dockerfile.test \
+		--tag vps-provision-test:latest \
+		--build-arg BUILDKIT_INLINE_CACHE=1 \
+		--build-arg UID=10001 \
+		--build-arg GID=10001 \
+		--label "test.framework=bats-core" \
+		--label "test.type=isolated-e2e" \
+		--progress=auto \
+		.
+	@printf "$(COLOR_GREEN)✓ Test image built: vps-provision-test:latest$(COLOR_RESET)\n"
+	@docker images vps-provision-test:latest
 
-test-e2e-isolated-rebuild: ## Rebuild and run isolated E2E tests
+test-e2e-isolated-rebuild: ## Rebuild and run isolated E2E tests (force rebuild)
 	@printf "$(COLOR_YELLOW)Rebuilding and running isolated E2E tests...$(COLOR_RESET)\n"
 	@REBUILD=true bash $(TEST_E2E_DIR)/run-isolated-test.sh
+
+test-e2e-isolated-debug: ## Run isolated tests with debug output and keep container
+	@printf "$(COLOR_YELLOW)Running isolated tests in debug mode...$(COLOR_RESET)\n"
+	@DEBUG=true VERBOSE=true bash $(TEST_E2E_DIR)/run-isolated-test.sh --keep-container
 
 test-e2e-kvm: check-kvm-prerequisites ## Run E2E tests in KVM virtual machine (requires base image)
 	@printf "$(COLOR_YELLOW)Running E2E tests in KVM VM...$(COLOR_RESET)\n"

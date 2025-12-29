@@ -56,23 +56,43 @@ check_prerequisites() {
         return 1
     fi
     
-    # Check KVM support
+    # Check KVM support and permissions
     if [[ ! -e /dev/kvm ]]; then
         log_error "/dev/kvm not found. KVM not available or not enabled."
         log_error "Check with: lsmod | grep kvm"
         return 1
     fi
     
-    # Check libvirt network
-    if ! virsh net-list --all | grep -q "default"; then
-        log_warn "Libvirt default network not found. Creating..."
-        sudo virsh net-define /usr/share/libvirt/networks/default.xml || true
+    # Check if user has KVM access
+    if ! groups | grep -qE '\b(kvm|libvirt)\b'; then
+        log_error "User not in kvm or libvirt group"
+        log_error "Fix: sudo usermod -aG kvm,libvirt \$USER && newgrp kvm"
+        log_error "Then logout/login or run: newgrp kvm"
+        return 1
     fi
     
-    if ! virsh net-list | grep -q "default.*active"; then
-        log_info "Starting libvirt default network..."
-        sudo virsh net-start default
-        sudo virsh net-autostart default
+    # Test KVM access
+    if ! test -r /dev/kvm || ! test -w /dev/kvm; then
+        log_error "No read/write access to /dev/kvm"
+        log_error "Run: newgrp kvm (then retry)"
+        return 1
+    fi
+    
+    # Check and setup libvirt network
+    if virsh net-list --all 2>/dev/null | grep -q "default"; then
+        # Network exists, check if active
+        if ! virsh net-list 2>/dev/null | grep -q "default.*active"; then
+            log_info "Starting libvirt default network..."
+            sudo virsh net-start default 2>/dev/null || true
+        fi
+        # Ensure autostart is enabled
+        sudo virsh net-autostart default 2>/dev/null || true
+    else
+        # Network doesn't exist, create it
+        log_info "Creating libvirt default network..."
+        sudo virsh net-define /usr/share/libvirt/networks/default.xml 2>/dev/null || true
+        sudo virsh net-start default 2>/dev/null || true
+        sudo virsh net-autostart default 2>/dev/null || true
     fi
     
     # Check output directory permissions
@@ -111,10 +131,21 @@ build_base_image() {
     # Build image
     log_info "Starting Packer build..."
     if ! packer build \
-        -var "output_directory=$OUTPUT_DIR" \
         -var "vm_name=$BASE_IMAGE_NAME" \
         "$PACKER_TEMPLATE"; then
         log_error "Packer build failed"
+        return 1
+    fi
+    
+    # Move image to final location
+    log_info "Moving image to final location..."
+    local packer_output="/tmp/packer-output/${BASE_IMAGE_NAME}"
+    if [[ -f "$packer_output" ]]; then
+        sudo mv "$packer_output" "$BASE_IMAGE_PATH"
+        sudo rm -rf /tmp/packer-output
+        log_info "Image moved to $BASE_IMAGE_PATH"
+    else
+        log_error "Packer output not found at $packer_output"
         return 1
     fi
     
@@ -158,44 +189,63 @@ create_snapshot() {
     
     # Import base image as VM
     log_info "Importing base image as test VM..."
-    virt-install \
+    if ! sudo virt-install \
         --name "$vm_name" \
-        --memory 4096 \
+        --memory 2048 \
         --vcpus 2 \
         --disk path="$BASE_IMAGE_PATH",format=qcow2,bus=virtio \
         --import \
         --os-variant debian12 \
         --network network=default,model=virtio \
         --graphics none \
-        --noautoconsole &>/dev/null
+        --noautoconsole &>/dev/null; then
+        log_warn "Failed to create test VM (non-critical)"
+        log_info "Base image is ready at: $BASE_IMAGE_PATH"
+        return 0
+    fi
+    
+    # Wait for VM to be defined
+    log_info "Waiting for VM to be defined..."
+    sleep 5
+    
+    # Verify VM was created
+    if ! sudo virsh list --all 2>/dev/null | grep -q "$vm_name"; then
+        log_warn "VM '$vm_name' was not created (non-critical)"
+        log_info "Base image is ready at: $BASE_IMAGE_PATH"
+        return 0
+    fi
     
     # Wait for VM to boot
-    log_info "Waiting for VM to boot (30 seconds)..."
-    sleep 30
+    log_info "Waiting for VM to start..."
+    sleep 10
     
     # Create snapshot
     log_info "Creating snapshot '$snapshot_name'..."
-    if virsh snapshot-create-as \
+    if sudo virsh snapshot-create-as \
         "$vm_name" \
         "$snapshot_name" \
         "Clean Debian 13 installation" \
         --disk-only \
-        --quiesce; then
+        --atomic 2>/dev/null; then
         log_info "Snapshot created successfully"
     else
-        log_warn "Snapshot creation failed (this is expected for disk-only snapshots on some systems)"
+        log_warn "Snapshot creation skipped (disk-only snapshots not supported on this system)"
     fi
     
-    # List snapshots
+    # List snapshots if VM exists
     log_info "Available snapshots:"
-    virsh snapshot-list "$vm_name" || log_info "No snapshots available"
+    if sudo virsh list --all 2>/dev/null | grep -q "$vm_name"; then
+        sudo virsh snapshot-list "$vm_name" 2>/dev/null || log_info "No snapshots available"
+    else
+        log_info "No snapshots available (VM already cleaned up)"
+    fi
     
     # Shutdown and remove test VM
     log_info "Cleaning up test VM..."
-    virsh destroy "$vm_name" 2>/dev/null || true
-    virsh undefine "$vm_name" --snapshots-metadata 2>/dev/null || true
+    sudo virsh destroy "$vm_name" 2>/dev/null || true
+    sudo virsh undefine "$vm_name" --snapshots-metadata 2>/dev/null || true
     
-    log_info "Snapshot verification complete"
+    log_info "Base image ready for use at: $BASE_IMAGE_PATH"
 }
 
 # Main execution

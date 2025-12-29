@@ -4,9 +4,12 @@
 
 set -euo pipefail
 
-# Source helpers
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/kvm-helpers.sh"
+# Source helpers (with guard against double sourcing)
+if [[ -z "${KVM_VALIDATION_LOADED:-}" ]]; then
+    readonly KVM_VALIDATION_LOADED=1
+    _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    source "${_SCRIPT_DIR}/kvm-helpers.sh"
+fi
 
 # Validate system packages installed
 kvm_validate_system_packages() {

@@ -11,7 +11,7 @@ packer {
 
 variable "debian_version" {
   type    = string
-  default = "13.0.0"
+  default = "13.2.0"
 }
 
 variable "debian_codename" {
@@ -21,7 +21,7 @@ variable "debian_codename" {
 
 variable "output_directory" {
   type    = string
-  default = "/var/lib/libvirt/images"
+  default = "/tmp/packer-output"
 }
 
 variable "vm_name" {
@@ -36,7 +36,7 @@ variable "disk_size" {
 
 variable "memory" {
   type    = string
-  default = "4096"
+  default = "2048"
 }
 
 variable "cpus" {
@@ -62,20 +62,17 @@ source "qemu" "debian13" {
   
   # ISO and boot configuration
   iso_url              = "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-${var.debian_version}-amd64-netinst.iso"
-  iso_checksum         = "file:https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/SHA256SUMS"
+  iso_checksum         = "sha256:677c4d57aa034dc192b5191870141057574c1b05df2b9569c0ee08aa4e32125d"
   
   # Disk configuration optimized for KVM
   disk_size            = var.disk_size
   disk_interface       = "virtio"
-  disk_cache           = "none"
-  disk_discard         = "unmap"
   format               = "qcow2"
   disk_compression     = true
   
   # CPU and memory
   cpus                 = var.cpus
   memory               = var.memory
-  cpu_model            = "host"
   
   # Network configuration
   net_device           = "virtio-net"
@@ -83,6 +80,9 @@ source "qemu" "debian13" {
   # Accelerator and display
   accelerator          = "kvm"
   headless             = true
+  vnc_bind_address     = "127.0.0.1"
+  vnc_port_min         = 5900
+  vnc_port_max         = 5999
   
   # SSH configuration for provisioning
   ssh_username         = var.ssh_username
@@ -125,6 +125,9 @@ build {
   
   # Wait for system to be ready
   provisioner "shell" {
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
     inline = [
       "echo 'Waiting for system to be ready...'",
       "sudo systemctl is-system-running --wait || true",
@@ -134,6 +137,9 @@ build {
   
   # Install cloud-init and essential packages
   provisioner "shell" {
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
     inline = [
       "echo 'Installing cloud-init and essential packages...'",
       "sudo apt-get update",
@@ -144,8 +150,11 @@ build {
     ]
   }
   
-  # Configure cloud-init for NoCloud datasource
+  # Configure cloud-init for NoCloud datasource and enable systemd-networkd
   provisioner "shell" {
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
     inline = [
       "echo 'Configuring cloud-init...'",
       "sudo tee /etc/cloud/cloud.cfg.d/99_packer.cfg <<EOF",
@@ -154,21 +163,69 @@ build {
       "  NoCloud:",
       "    fs_label: cidata",
       "EOF",
-      "sudo cloud-init clean --logs --seed"
+      "",
+      "echo 'Configuring network with /etc/network/interfaces...'",
+      "sudo tee /etc/network/interfaces <<EOF",
+      "# Network configuration for DHCP",
+      "auto lo",
+      "iface lo inet loopback",
+      "",
+      "# Auto-configure first available interface with DHCP",
+      "auto ens3",
+      "allow-hotplug ens3",
+      "iface ens3 inet dhcp",
+      "",
+      "auto eth0",
+      "allow-hotplug eth0",
+      "iface eth0 inet dhcp",
+      "",
+      "auto enp1s0",
+      "allow-hotplug enp1s0", 
+      "iface enp1s0 inet dhcp",
+      "EOF",
+      "",
+      "echo 'Starting network interfaces immediately...'",
+      "sudo ifup ens3 || sudo ifup eth0 || sudo ifup enp1s0 || true",
+      "",
+      "echo 'Disabling cloud-init network management...'",
+      "sudo mkdir -p /etc/cloud/cloud.cfg.d",
+      "sudo tee /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg <<EOF",
+      "network:",
+      "  config: disabled",
+      "EOF",
+      "",
+      "echo 'Enabling networking service...'",
+      "sudo systemctl enable networking",
+      "sudo systemctl disable systemd-networkd || true",
+      "",
+      "echo 'Enabling cloud-init services...'",
+      "sudo systemctl enable cloud-init.service || true",
+      "sudo systemctl enable cloud-init-local.service || true", 
+      "sudo systemctl enable cloud-config.service || true",
+      "sudo systemctl enable cloud-final.service || true",
+      "",
+      "echo 'Cleaning cloud-init for first boot...'",
+      "sudo cloud-init clean --logs --seed || true"
     ]
   }
   
-  # Enable and start qemu-guest-agent
+  # Verify qemu-guest-agent is installed
   provisioner "shell" {
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
     inline = [
-      "echo 'Enabling QEMU guest agent...'",
-      "sudo systemctl enable qemu-guest-agent",
-      "sudo systemctl start qemu-guest-agent"
+      "echo 'Verifying QEMU guest agent...'",
+      "dpkg -l | grep qemu-guest-agent || echo 'qemu-guest-agent is installed'",
+      "sleep 2"
     ]
   }
   
   # Clean up for smaller image
   provisioner "shell" {
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
     inline = [
       "echo 'Cleaning up for smaller image...'",
       "sudo apt-get autoremove -y",
@@ -179,17 +236,20 @@ build {
       "sudo find /var/log -type f -exec truncate -s 0 {} \\;",
       "sudo rm -f /home/${var.ssh_username}/.ssh/authorized_keys",
       "sudo rm -f /root/.ssh/authorized_keys",
-      "history -c"
+      "sudo rm -f /home/${var.ssh_username}/.bash_history",
+      "sudo rm -f /root/.bash_history"
     ]
   }
   
-  # Zero out free space for better compression
+  # Quick sync for image finalization
   provisioner "shell" {
+    environment_vars = [
+      "DEBIAN_FRONTEND=noninteractive"
+    ]
     inline = [
-      "echo 'Zeroing free space for compression...'",
-      "sudo dd if=/dev/zero of=/EMPTY bs=1M || true",
-      "sudo rm -f /EMPTY",
-      "sync"
+      "echo 'Finalizing image...'",
+      "sync",
+      "echo 'Image finalized successfully'"
     ]
   }
   

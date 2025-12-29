@@ -24,12 +24,11 @@ setup() {
     export CURSOR_TMP_DEB="${BATS_TEST_TMPDIR}/cursor.deb"
     export CURSOR_APPIMAGE="${CURSOR_INSTALL_DIR}/cursor.AppImage"
     
-    # Antigravity Overrides
+    # Antigravity Overrides (must be set before sourcing module due to readonly)
     export ANTIGRAVITY_CHECKPOINT="ide-antigravity"
-    export ANTIGRAVITY_INSTALL_DIR="${BATS_TEST_TMPDIR}/antigravity"
+    export ANTIGRAVITY_GPG_KEY="${BATS_TEST_TMPDIR}/antigravity-repo-key.gpg"
+    export ANTIGRAVITY_LIST="${BATS_TEST_TMPDIR}/antigravity.list"
     export ANTIGRAVITY_DESKTOP="${BATS_TEST_TMPDIR}/antigravity.desktop"
-    export ANTIGRAVITY_APPIMAGE="${ANTIGRAVITY_INSTALL_DIR}/antigravity.AppImage"
-    export ANTIGRAVITY_ICON_PATH="${BATS_TEST_TMPDIR}/antigravity.png"
 
     # Create directories
     mkdir -p "${CHECKPOINT_DIR}"
@@ -37,7 +36,6 @@ setup() {
     mkdir -p "$(dirname "${VSCODE_GPG_KEY}")"
     mkdir -p "$(dirname "${VSCODE_DESKTOP}")"
     mkdir -p "${CURSOR_INSTALL_DIR}"
-    mkdir -p "${ANTIGRAVITY_INSTALL_DIR}"
     mkdir -p "${MOCK_BIN_DIR}"
     touch "${LOG_FILE}"
     touch "${TRANSACTION_LOG}"
@@ -291,41 +289,63 @@ teardown() {
     [ "$status" -eq 0 ]
 }
 
-@test "ide_antigravity_install_fuse: installs FUSE for AppImage support" {
-    # Mock apt-get to simulate install
-    function apt-get() {
-        if [[ "$1" == "install" ]]; then
-            touch "${BATS_TEST_TMPDIR}/fuse_installed"
-        fi
-        return 0
-    }
-    export -f apt-get
+@test "ide_antigravity_add_gpg_key: adds GPG key for Antigravity repository" {
+    # Mock curl and gpg
+    function curl() { echo "mock-gpg-key"; return 0; }
+    export -f curl
+    function gpg() { touch "${ANTIGRAVITY_GPG_KEY}"; return 0; }
+    export -f gpg
     
-    run ide_antigravity_install_fuse
+    run ide_antigravity_add_gpg_key
+    [ "$status" -eq 0 ]
+    [ -f "${ANTIGRAVITY_GPG_KEY}" ]
+}
+
+@test "ide_antigravity_add_repository: adds Antigravity repository" {
+    run ide_antigravity_add_repository
+    [ "$status" -eq 0 ]
+    [ -f "${ANTIGRAVITY_LIST}" ]
+}
+
+@test "ide_antigravity_update_apt: updates APT cache" {
+    run ide_antigravity_update_apt
     [ "$status" -eq 0 ]
 }
 
-@test "ide_antigravity_create_launcher: creates desktop launcher" {
-    run ide_antigravity_create_launcher
+@test "ide_antigravity_install_package: installs Antigravity package" {
+    # Mock dpkg to show package installed
+    function dpkg() {
+        if [[ "$1" == "-l" && "$2" == "antigravity" ]]; then
+            echo "ii  antigravity  1.0.0  amd64"
+            return 0
+        fi
+        return 1
+    }
+    export -f dpkg
+    
+    run ide_antigravity_install_package
     [ "$status" -eq 0 ]
-    [ -f "${ANTIGRAVITY_DESKTOP}" ]
-    grep -q "Name=Antigravity" "${ANTIGRAVITY_DESKTOP}"
 }
 
 @test "ide_antigravity_verify: passes when Antigravity is installed" {
-    # Mock command
+    # Mock dpkg to show package installed
+    function dpkg() {
+        if [[ "$1" == "-l" && "$2" == "antigravity" ]]; then
+            echo "ii  antigravity  1.0.0  amd64"
+            return 0
+        fi
+        return 1
+    }
+    export -f dpkg
+    
+    # Mock antigravity command
     function antigravity() { return 0; }
     export -f antigravity
     
-    # Mock files
-    touch "${ANTIGRAVITY_APPIMAGE}"
-    chmod +x "${ANTIGRAVITY_APPIMAGE}"
-    touch "${ANTIGRAVITY_DESKTOP}"
-    
-    # Mock symlink location check (validate_installation checks /usr/local/bin path specifically)
-    # The module checks: if [[ "$antigravity_path" != "/usr/local/bin/antigravity" ]]; then
-    # We can't easily mock `command -v` to return a specific path unless we alias it or put it in PATH.
-    # But it is just a warning, so it shouldn't fail the test.
+    # Create mock binary in PATH
+    echo '#!/bin/bash' > "${MOCK_BIN_DIR}/antigravity"
+    chmod +x "${MOCK_BIN_DIR}/antigravity"
+    export PATH="${MOCK_BIN_DIR}:${PATH}"
     
     run ide_antigravity_verify
     [ "$status" -eq 0 ]
@@ -373,16 +393,14 @@ teardown() {
     # Mock successful steps
     function ide_antigravity_check_prerequisites() { return 0; }
     export -f ide_antigravity_check_prerequisites
-    function ide_antigravity_install_fuse() { return 0; }
-    export -f ide_antigravity_install_fuse
-    function ide_antigravity_fetch_url() { echo "http://example.com/app.AppImage"; }
-    export -f ide_antigravity_fetch_url
-    function ide_antigravity_install_appimage() { return 0; }
-    export -f ide_antigravity_install_appimage
-    function ide_antigravity_create_launcher() { return 0; }
-    export -f ide_antigravity_create_launcher
-    function ide_antigravity_create_cli_alias() { return 0; }
-    export -f ide_antigravity_create_cli_alias
+    function ide_antigravity_add_gpg_key() { return 0; }
+    export -f ide_antigravity_add_gpg_key
+    function ide_antigravity_add_repository() { return 0; }
+    export -f ide_antigravity_add_repository
+    function ide_antigravity_update_apt() { return 0; }
+    export -f ide_antigravity_update_apt
+    function ide_antigravity_install_package() { return 0; }
+    export -f ide_antigravity_install_package
     function ide_antigravity_verify() { return 0; }
     export -f ide_antigravity_verify
     
