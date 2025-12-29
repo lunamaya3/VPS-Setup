@@ -78,13 +78,13 @@ log_info() {
 }
 
 log_warn() {
-    ((WARNING_COUNT++))
+    ((WARNING_COUNT++)) || true
     log_to_file "[WARNING] $*"
     [[ "${QUIET_MODE}" == "false" ]] && echo -e "${YELLOW}[WARNING]${NC} $*" >&2
 }
 
 log_error() {
-    ((ERROR_COUNT++))
+    ((ERROR_COUNT++)) || true
     log_to_file "[ERROR] $*"
     echo -e "${RED}[ERROR]${NC} $*" >&2
 }
@@ -610,7 +610,7 @@ cleanup_old_images() {
     
     local count=0
     while IFS= read -r tag created; do
-        ((count++))
+        ((count++)) || true
         if [[ $count -gt $MAX_IMAGES_TO_KEEP ]]; then
             log_debug "Removing old image: ${IMAGE_NAME}:${tag}"
             docker rmi "${IMAGE_NAME}:${tag}" >/dev/null 2>&1 || true

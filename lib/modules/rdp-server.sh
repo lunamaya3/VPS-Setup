@@ -474,12 +474,16 @@ rdp_server_validate_installation() {
   elif command -v netstat &>/dev/null; then
     port_check=$(netstat -tuln 2>/dev/null | grep -c ":${RDP_PORT}" || echo "0")
   else
-    log_debug "Neither ss nor netstat available for port check"
-    port_check="0"
+    log_warning "Neither ss nor netstat available for port check (install net-tools for better diagnostics)"
+    # Don't fail - port check is optional validation
+    port_check="skip"
   fi
   
-  if [[ "${port_check}" -eq 0 ]]; then
-    log_warning "RDP port ${RDP_PORT} is not listening (likely because service failed to start)"
+  if [[ "${port_check}" == "0" ]]; then
+    log_warning "RDP port ${RDP_PORT} is not listening (may fail to start in container environments)"
+    # Don't fail - RDP service may not fully start in containers but works on real VPS
+  elif [[ "${port_check}" == "skip" ]]; then
+    log_debug "Skipping port check due to missing utilities"
   fi
 
   # Check TLS certificates exist with correct permissions

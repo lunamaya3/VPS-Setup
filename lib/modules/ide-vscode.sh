@@ -322,8 +322,12 @@ ide_vscode_configure() {
 }
 EOF
 
-  # Set proper ownership
-  chown -R "$username:$username" "$user_home/.config"
+  # Set proper ownership (check if user exists)
+  if id "$username" &>/dev/null; then
+    chown -R "$username:$username" "$user_home/.config"
+  else
+    log_warning "User $username does not exist yet, skipping ownership change"
+  fi
 
   transaction_log "vscode_config" "rm -rf '$config_dir'"
   log_info "VSCode configuration completed for user: $username"
