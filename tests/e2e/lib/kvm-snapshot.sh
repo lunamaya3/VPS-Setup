@@ -4,12 +4,9 @@
 
 set -euo pipefail
 
-# Source helpers (with guard against double sourcing)
-if [[ -z "${KVM_SNAPSHOT_LOADED:-}" ]]; then
-    readonly KVM_SNAPSHOT_LOADED=1
-    _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    source "${_SCRIPT_DIR}/kvm-helpers.sh"
-fi
+# Source helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/kvm-helpers.sh"
 
 # Create VM snapshot
 kvm_snapshot_create() {

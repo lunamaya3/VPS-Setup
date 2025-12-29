@@ -818,7 +818,7 @@ main() {
   
   # Generate summary report
   log_info "Generating summary report..."
-  generate_summary_report
+  summary_report_generate
   
   # Update final status
   state_update_status "COMPLETED"

@@ -356,20 +356,6 @@ system_prep_clean_apt_cache() {
 system_prep_harden_ssh() {
   log_info "Hardening SSH configuration..."
 
-  # Check if SSH server is installed (openssh-server package)
-  if ! dpkg -s openssh-server &>/dev/null; then
-    log_warning "SSH server not installed, skipping SSH hardening"
-    log_info "To enable SSH hardening, install openssh-server package"
-    return 0
-  fi
-
-  # Check if SSH config file exists
-  if [[ ! -f "${SSHD_CONFIG}" ]]; then
-    log_warning "SSH configuration file not found: ${SSHD_CONFIG}"
-    log_warning "Skipping SSH hardening (SSH server may not be configured)"
-    return 0
-  fi
-
   # Backup original sshd_config before modifications per RR-004
   if [[ ! -f "${SSHD_CONFIG_BACKUP}" ]]; then
     if cp "${SSHD_CONFIG}" "${SSHD_CONFIG_BACKUP}"; then
@@ -455,13 +441,6 @@ EOF
       log_info "SSH configuration hardened successfully"
 
       # Restart SSH service to apply changes per RR-024
-      # Skip restart in Docker/testing environment without active systemd
-      if [[ ! -d /run/systemd/system ]]; then
-        log_warning "systemd not available (likely Docker/test environment)"
-        log_info "Skipping SSH service restart - configuration will apply on next boot"
-        return 0
-      fi
-
       local retry_count=0
       local max_retries=3
       local retry_delay=5
@@ -521,27 +500,26 @@ system_prep_verify() {
     verification_failed=true
   fi
 
-  # Verify SSH hardening applied (skip if SSH not installed)
-  if dpkg -s openssh-server &>/dev/null; then
-    if [[ -f "${SSHD_CONFIG}" ]]; then
-      if grep -q "^PermitRootLogin no" "${SSHD_CONFIG}" &&
-        grep -q "^PasswordAuthentication no" "${SSHD_CONFIG}"; then
-        log_info "SSH hardening verified (root login disabled, password auth disabled)"
-      else
-        log_warning "SSH hardening not applied (may be expected in some environments)"
-      fi
+  # Verify SSH hardening applied
+  if [[ -f "${SSHD_CONFIG}" ]]; then
+    if grep -q "^PermitRootLogin no" "${SSHD_CONFIG}" &&
+      grep -q "^PasswordAuthentication no" "${SSHD_CONFIG}"; then
+      log_info "SSH hardening verified (root login disabled, password auth disabled)"
     else
-      log_warning "SSH configuration file missing (openssh-server installed but not configured)"
-    fi
-
-    # Verify SSH service running
-    if systemctl is-active --quiet sshd || systemctl is-active --quiet ssh; then
-      log_info "SSH service is active"
-    else
-      log_warning "SSH service not running (may be expected in container environments)"
+      log_error "Verification failed: SSH hardening not applied"
+      verification_failed=true
     fi
   else
-    log_info "SSH server not installed, skipping SSH verification"
+    log_error "Verification failed: SSH configuration file missing"
+    verification_failed=true
+  fi
+
+  # Verify SSH service running
+  if systemctl is-active --quiet sshd; then
+    log_info "SSH service is active"
+  else
+    log_error "Verification failed: SSH service not running"
+    verification_failed=true
   fi
 
   # Verify critical commands available

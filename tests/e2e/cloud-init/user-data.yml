@@ -17,23 +17,13 @@ users:
     ssh_authorized_keys:
       - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC7Z8qL5m3XYvH8cF5Q+xBvH9z8QBcXeKzOkJKL7mNpD0vN1qRGxO2pLwH3mZ0YvKxN8qL7mNpD0vN1qRGxO2p test-vm-key
 
-# Network configuration - use static IP for reliable testing
+# Network configuration (DHCP)
 network:
   version: 2
   ethernets:
-    id0:
-      match:
-        name: "en*" # Match any interface starting with 'en'
-      dhcp4: false
-      addresses:
-        - 192.168.122.100/24 # Static IP in libvirt default range
-      routes:
-        - to: default
-          via: 192.168.122.1
-      nameservers:
-        addresses:
-          - 192.168.122.1
-          - 8.8.8.8
+    ens3:
+      dhcp4: true
+      dhcp6: false
 
 # Package management
 package_update: true
