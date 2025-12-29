@@ -156,7 +156,7 @@ acquire_lock() {
             log_error "Another instance is already running (PID: $lock_pid)"
             exit 1
         else
-            log_warn "Stale lock file found, removing"
+            log_debug "Stale lock file found, removing"
             rm -f "${LOCK_FILE}"
         fi
     fi

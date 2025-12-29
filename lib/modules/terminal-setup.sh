@@ -321,7 +321,7 @@ terminal_setup_apply_to_user() {
 
   # Set correct ownership
   if ! chown "${username}:${username}" "${user_bashrc}" 2>/dev/null; then
-    log_warning "Failed to set ownership for ${user_bashrc} (non-critical in container environments)"
+    log_info "Note: Could not set ownership for ${user_bashrc} (expected in some container environments)"
   fi
 
   transaction_log "restore_file_from_backup ${user_bashrc}"

@@ -474,6 +474,16 @@ rdp_server_validate_installation() {
     # return 1
   fi
 
+  # Ensure we have a tool for port checks
+  if ! command -v ss &>/dev/null && ! command -v netstat &>/dev/null; then
+    log_info "Installing iproute2 for port validation"
+    if DEBIAN_FRONTEND=noninteractive apt-get install -y iproute2 >/dev/null 2>&1; then
+      log_info "iproute2 installed for port checks"
+    else
+      log_debug "iproute2 installation unavailable; skipping port validation"
+    fi
+  fi
+
   # Check port 3389 is listening (try ss first, fallback to netstat)
   local port_check=""
   if command -v ss &>/dev/null; then
@@ -481,8 +491,7 @@ rdp_server_validate_installation() {
   elif command -v netstat &>/dev/null; then
     port_check=$(netstat -tuln 2>/dev/null | grep -c ":${RDP_PORT}" || echo "0")
   else
-    log_warning "Neither ss nor netstat available for port check (install net-tools for better diagnostics)"
-    # Don't fail - port check is optional validation
+    log_debug "No port checking utility available; skipping port validation"
     port_check="skip"
   fi
   
@@ -515,7 +524,7 @@ rdp_server_validate_installation() {
   local key_perms
   key_perms=$(stat -c "%a" "${target_file}")
   if [[ "${key_perms}" != "600" ]]; then
-    log_warning "Incorrect key file permissions: ${key_perms}, fixing to 600"
+    log_info "Adjusting key file permissions from ${key_perms} to 600"
     
     # Set permissions on target file (works for both regular files and symlink targets)
     chmod 600 "${target_file}" 2>&1 | tee -a "${LOG_FILE}"

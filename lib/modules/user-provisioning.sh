@@ -258,8 +258,8 @@ user_provisioning_configure_audit() {
 
   # Start auditd if not running (non-critical in container environments)
   if ! systemctl is-active auditd &>/dev/null; then
-    if ! systemctl start auditd 2>&1 | tee -a "${LOG_FILE}"; then
-      log_warning "Failed to start auditd (expected in container environments - will work on real VPS)"
+    if ! systemctl start auditd &>/dev/null; then
+      log_info "Failed to start auditd (expected in container environments - will work on real VPS)"
       # Don't fail - auditd often doesn't work in containers but works fine on real VPS
     fi
   fi
