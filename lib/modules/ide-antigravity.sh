@@ -20,10 +20,10 @@ source "${LIB_DIR}/core/transaction.sh"
 # Constants
 readonly ANTIGRAVITY_CHECKPOINT="${ANTIGRAVITY_CHECKPOINT:-ide-antigravity}"
 readonly ANTIGRAVITY_GPG_URL="https://us-central1-apt.pkg.dev/doc/repo-signing-key.gpg"
-readonly ANTIGRAVITY_GPG_KEY="${ANTIGRAVITY_GPG_KEY:-/etc/apt/keyrings/antigravity-repo-key.gpg}"
-readonly ANTIGRAVITY_REPO="${ANTIGRAVITY_REPO:-deb [signed-by=/etc/apt/keyrings/antigravity-repo-key.gpg] https://us-central1-apt.pkg.dev/projects/antigravity-auto-updater-dev/ antigravity-debian main}"
-readonly ANTIGRAVITY_LIST="${ANTIGRAVITY_LIST:-/etc/apt/sources.list.d/antigravity.list}"
-readonly ANTIGRAVITY_DESKTOP="${ANTIGRAVITY_DESKTOP:-/usr/share/applications/antigravity.desktop}"
+readonly ANTIGRAVITY_GPG_KEY="/etc/apt/keyrings/antigravity-repo-key.gpg"
+readonly ANTIGRAVITY_REPO="deb [signed-by=/etc/apt/keyrings/antigravity-repo-key.gpg] https://us-central1-apt.pkg.dev/projects/antigravity-auto-updater-dev/ antigravity-debian main"
+readonly ANTIGRAVITY_LIST="/etc/apt/sources.list.d/antigravity.list"
+readonly ANTIGRAVITY_DESKTOP="/usr/share/applications/antigravity.desktop"
 
 #######################################
 # Check prerequisites for Antigravity installation

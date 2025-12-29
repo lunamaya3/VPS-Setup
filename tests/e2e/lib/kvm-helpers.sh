@@ -4,12 +4,6 @@
 
 set -euo pipefail
 
-# Guard against double sourcing
-if [[ -n "${KVM_HELPERS_LOADED:-}" ]]; then
-    return 0
-fi
-readonly KVM_HELPERS_LOADED=1
-
 # Configuration
 readonly DEFAULT_MEMORY="4096"
 readonly DEFAULT_VCPUS="2"
@@ -124,8 +118,7 @@ kvm_create_vm() {
     
     kvm_log_info "Creating VM: $vm_name"
     
-    kvm_log_info "Running virt-install (this may take a moment)..."
-    if ! sudo virt-install \
+    virt-install \
         --name "$vm_name" \
         --memory "$memory" \
         --vcpus "$vcpus" \
@@ -135,28 +128,10 @@ kvm_create_vm() {
         --os-variant debian12 \
         --network network=default,model=virtio \
         --graphics none \
-        --noautoconsole 2>&1; then
-        kvm_log_error "Failed to create VM"
-        kvm_log_error "Check if libvirt and KVM are properly configured"
-        return 1
-    fi
+        --noautoconsole \
+        --noreboot &>/dev/null
     
     kvm_log_info "VM created and starting..."
-    
-    # Wait for VM to actually start (check domain state)
-    local wait_count=0
-    while (( wait_count < 30 )); do
-        if sudo virsh domstate "$vm_name" 2>/dev/null | grep -q "running"; then
-            kvm_log_info "VM is running"
-            break
-        fi
-        sleep 1
-        ((wait_count++))
-    done
-    
-    # Give cloud-init time to initialize
-    kvm_log_info "Waiting for cloud-init to initialize..."
-    sleep 15
 }
 
 # Get VM IP address
@@ -165,57 +140,24 @@ kvm_get_vm_ip() {
     local timeout="${2:-$BOOT_TIMEOUT}"
     local elapsed=0
     
-    kvm_log_info "Waiting for VM IP address (timeout: ${timeout}s)..."
-    
-    # Fast path: Try known static IP first (from cloud-init config)
-    local static_ip="192.168.122.100"
-    if ping -c 1 -W 2 "$static_ip" &>/dev/null; then
-        kvm_log_info "VM using static IP: $static_ip"
-        echo "$static_ip"
-        return 0
-    fi
+    kvm_log_info "Waiting for VM IP address..."
     
     while (( elapsed < timeout )); do
         local ip
+        ip=$(virsh domifaddr "$vm_name" 2>/dev/null | \
+            awk '/ipv4/ {gsub(/\/.*/, "", $4); print $4}' | head -n1)
         
-        # Method 1: Try DHCP lease first (most reliable for new VMs)
-        ip=$(sudo virsh domifaddr "$vm_name" --source lease 2>/dev/null | \
-            awk '/ipv4/ {print $4}' | cut -d'/' -f1 | head -n1)
-        
-        # Method 2: Try QEMU guest agent
-        if [[ -z "$ip" || "$ip" == "-" ]]; then
-            ip=$(sudo virsh domifaddr "$vm_name" --source agent 2>/dev/null | \
-                awk '/ipv4/ {print $4}' | cut -d'/' -f1 | head -n1)
-        fi
-        
-        # Method 3: Parse from neighbor table
-        if [[ -z "$ip" || "$ip" == "-" ]]; then
-            local mac
-            mac=$(sudo virsh domiflist "$vm_name" 2>/dev/null | awk '/network/ {print $5}' | head -n1)
-            if [[ -n "$mac" ]]; then
-                # Try ip neigh first (modern replacement for arp)
-                ip=$(ip neigh show 2>/dev/null | grep -i "$mac" | awk '{print $1}' | head -n1)
-            fi
-        fi
-        
-        # Method 4: Check libvirt network DHCP leases
-        if [[ -z "$ip" || "$ip" == "-" ]]; then
-            ip=$(sudo virsh net-dhcp-leases default 2>/dev/null | grep "$vm_name" | awk '{print $5}' | cut -d'/' -f1 | head -n1)
-        fi
-        
-        # Validate IP format
-        if [[ -n "$ip" && "$ip" != "-" && "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            kvm_log_info "VM IP address found: $ip"
+        if [[ -n "$ip" ]]; then
+            kvm_log_info "VM IP address: $ip"
             echo "$ip"
             return 0
         fi
         
-        sleep 5
-        elapsed=$((elapsed + 5))
+        sleep 2
+        elapsed=$((elapsed + 2))
     done
     
     kvm_log_error "Timeout waiting for VM IP address"
-    kvm_log_error "Debug: Check VM status with 'virsh list' and 'virsh domifaddr $vm_name'"
     return 1
 }
 
