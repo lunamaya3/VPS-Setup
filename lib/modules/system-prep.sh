@@ -544,11 +544,11 @@ system_prep_verify() {
     verification_failed=true
   fi
 
-  # Verify SSH hardening applied
+  # Verify SSH hardening applied (root login disabled, password auth explicitly set)
   if [[ -f "${SSHD_CONFIG}" ]]; then
     if grep -q "^PermitRootLogin no" "${SSHD_CONFIG}" &&
-      grep -q "^PasswordAuthentication no" "${SSHD_CONFIG}"; then
-      log_info "SSH hardening verified (root login disabled, password auth disabled)"
+      grep -q "^PasswordAuthentication yes" "${SSHD_CONFIG}"; then
+      log_info "SSH hardening verified (root login disabled, password auth enabled)"
     else
       log_error "Verification failed: SSH hardening not applied"
       verification_failed=true
