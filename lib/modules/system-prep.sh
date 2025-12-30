@@ -430,8 +430,9 @@ ListenAddress 0.0.0.0
 # SEC-005: Disable root login
 PermitRootLogin no
 
-# SEC-005: Disable password authentication (key-based only)
-PasswordAuthentication no
+# SEC-005: Allow password authentication so newly provisioned users can log in
+# Note: SSH keys remain supported and recommended.
+PasswordAuthentication yes
 PermitEmptyPasswords no
 ChallengeResponseAuthentication no
 UsePAM yes
