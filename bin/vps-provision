@@ -638,6 +638,7 @@ main() {
   source "${LIB_DIR}/modules/fail2ban.sh"
   source "${LIB_DIR}/modules/verification.sh"
   source "${LIB_DIR}/modules/summary-report.sh"
+  source "${LIB_DIR}/modules/status-banner.sh"
   # Initialize progress tracking with phase count
   progress_init 12
   
@@ -819,12 +820,16 @@ main() {
   # Display final credentials if available (FR-027)
   if [[ -n "${LAST_GENERATED_PASSWORD:-}" ]]; then
     local final_username="${LAST_GENERATED_USERNAME:-${CUSTOM_USERNAME:-devuser}}"
+    local final_password="${LAST_GENERATED_PASSWORD}"
     log_info "=================================="
     log_info "Credentials"
     log_info "Username: ${final_username}"
-    log_info "Password: ${LAST_GENERATED_PASSWORD}"
+    log_info "Password: ${final_password}"
     log_info "IMPORTANT: Change this password immediately after first login"
     log_info "=================================="
+
+    # Show banner with connection info to mirror quickstart guide
+    display_ready_banner "${final_username}" "${final_password}"
   else
     log_warning "Credentials not available (user provisioning may have been skipped or reused checkpoint)"
   fi
