@@ -612,6 +612,10 @@ user_provisioning_execute() {
   progress_update "Developer user created" 45
   log_info "User provisioning completed successfully"
 
+  # Expose credentials to caller for final banner/summary (FR-027)
+  export LAST_GENERATED_USERNAME="${username}"
+  export LAST_GENERATED_PASSWORD="${password}"
+
   return 0
 }
 

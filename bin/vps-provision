@@ -816,6 +816,19 @@ main() {
     exit 1
   fi
   
+  # Display final credentials if available (FR-027)
+  if [[ -n "${LAST_GENERATED_PASSWORD:-}" ]]; then
+    local final_username="${LAST_GENERATED_USERNAME:-${CUSTOM_USERNAME:-devuser}}"
+    log_info "=================================="
+    log_info "Credentials"
+    log_info "Username: ${final_username}"
+    log_info "Password: ${LAST_GENERATED_PASSWORD}"
+    log_info "IMPORTANT: Change this password immediately after first login"
+    log_info "=================================="
+  else
+    log_warning "Credentials not available (user provisioning may have been skipped or reused checkpoint)"
+  fi
+
   # Generate summary report
   log_info "Generating summary report..."
   generate_summary_report
