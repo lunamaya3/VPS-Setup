@@ -659,9 +659,21 @@ main() {
     log_info "Skipping system-prep (checkpoint exists)"
   fi
   
-  # Phase 2: Desktop Environment
+  # Phase 2: Development Tools (installed early for use by other modules)
+  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "dev-tools"; then
+    log_info "Phase 2: Development Tools Installation"
+    if dev_tools_execute; then
+      checkpoint_create "dev-tools"
+    else
+      log_warning "Development tools installation failed (non-critical)"
+    fi
+  else
+    log_info "Skipping dev-tools (checkpoint exists)"
+  fi
+  
+  # Phase 3: Desktop Environment
   if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "desktop-env"; then
-    log_info "Phase 2: Desktop Environment Installation"
+    log_info "Phase 3: Desktop Environment Installation"
     if desktop_env_execute; then
       checkpoint_create "desktop-env"
     else
@@ -672,10 +684,10 @@ main() {
     log_info "Skipping desktop-env (checkpoint exists)"
   fi
   
-  # Phase 3: User Provisioning
+  # Phase 4: User Provisioning
   if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "user-provisioning"; then
     progress_start_phase "user-provisioning"
-    log_info "Phase 3: User Provisioning"
+    log_info "Phase 4: User Provisioning"
     if user_provisioning_execute "${CUSTOM_USERNAME:-devuser}"; then
       progress_complete_phase "user-provisioning"
       checkpoint_create "user-provisioning"
@@ -687,9 +699,9 @@ main() {
     log_info "Skipping user-provisioning (checkpoint exists)"
   fi
   
-  # Phase 4: RDP Server
+  # Phase 5: RDP Server
   if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "rdp-server"; then
-    log_info "Phase 4: RDP Server Configuration"
+    log_info "Phase 5: RDP Server Configuration"
     if rdp_server_execute; then
       checkpoint_create "rdp-server"
     else
@@ -700,10 +712,10 @@ main() {
     log_info "Skipping rdp-server (checkpoint exists)"
   fi
   
-  # Phase 5: IDE Installations (VSCode)
+  # Phase 6: IDE Installations (VSCode)
   if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "ide-vscode"; then
     progress_start_phase "ide-vscode"
-    log_info "Phase 5: VSCode Installation"
+    log_info "Phase 6: VSCode Installation"
     if ide_vscode_execute; then
       progress_complete_phase "ide-vscode"
       checkpoint_create "ide-vscode"
@@ -714,10 +726,10 @@ main() {
     log_info "Skipping ide-vscode (checkpoint exists)"
   fi
   
-  # Phase 6: Cursor IDE
+  # Phase 7: Cursor IDE
   if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "ide-cursor"; then
     progress_start_phase "ide-cursor"
-    log_info "Phase 6: Cursor IDE Installation"
+    log_info "Phase 7: Cursor IDE Installation"
     if ide_cursor_execute; then
       progress_complete_phase "ide-cursor"
       checkpoint_create "ide-cursor"
@@ -728,10 +740,10 @@ main() {
     log_info "Skipping ide-cursor (checkpoint exists)"
   fi
   
-  # Phase 7: Antigravity IDE
+  # Phase 8: Antigravity IDE
   if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "ide-antigravity"; then
     progress_start_phase "ide-antigravity"
-    log_info "Phase 7: Antigravity IDE Installation"
+    log_info "Phase 8: Antigravity IDE Installation"
     if ide_antigravity_execute; then
       progress_complete_phase "ide-antigravity"
       checkpoint_create "ide-antigravity"
@@ -742,9 +754,9 @@ main() {
     log_info "Skipping ide-antigravity (checkpoint exists)"
   fi
   
-  # Phase 8: Terminal Setup
+  # Phase 9: Terminal Setup
   if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "terminal-setup"; then
-    log_info "Phase 8: Terminal Setup"
+    log_info "Phase 9: Terminal Setup"
     if terminal_setup_execute; then
       checkpoint_create "terminal-setup"
     else
@@ -752,18 +764,6 @@ main() {
     fi
   else
     log_info "Skipping terminal-setup (checkpoint exists)"
-  fi
-  
-  # Phase 9: Development Tools
-  if [[ "${provisioning_failed}" == "false" ]] && ! should_skip_phase "dev-tools"; then
-    log_info "Phase 9: Development Tools"
-    if dev_tools_execute; then
-      checkpoint_create "dev-tools"
-    else
-      log_warning "Development tools installation failed (non-critical)"
-    fi
-  else
-    log_info "Skipping dev-tools (checkpoint exists)"
   fi
   
   # Phase 10: Firewall Configuration
