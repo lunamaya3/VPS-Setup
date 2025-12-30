@@ -354,6 +354,27 @@ export -f checkpoint_create
   assert grep -q "exit 0" "${POLICY_RC_PATH}"
 }
 
+@test "system_prep: install_policy_rc_shim overwrites existing policy in container" {
+  # Mock validator_is_container to return 0 (success)
+  validator_is_container() { return 0; }
+  export -f validator_is_container
+
+  # Mock transaction_log
+  transaction_log() { return 0; }
+  export -f transaction_log
+
+  # Create a restrictive policy-rc.d first
+  echo "exit 101" > "${POLICY_RC_PATH}"
+  chmod +x "${POLICY_RC_PATH}"
+
+  run system_prep_install_policy_rc_shim
+  assert_success
+  
+  assert [ -f "${POLICY_RC_PATH}" ]
+  assert grep -q "exit 0" "${POLICY_RC_PATH}"
+  assert [ "$(grep -c "exit 101" "${POLICY_RC_PATH}")" -eq 0 ]
+}
+
 @test "system_prep: install_policy_rc_shim skips when not in container" {
   # Mock validator_is_container to return 1 (failure)
   validator_is_container() { return 1; }

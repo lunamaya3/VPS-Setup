@@ -163,12 +163,7 @@ system_prep_install_policy_rc_shim() {
     return 0
   fi
 
-  if [[ -f "${POLICY_RC_PATH}" ]]; then
-    log_info "policy-rc.d already exists, skipping installation"
-    return 0
-  fi
-
-  log_info "Installing policy-rc.d shim to allow service execution in container"
+  log_info "Installing policy-rc.d shim to allow service execution in container (overwriting existing policy if present)"
 
   cat >"${POLICY_RC_PATH}" <<'EOF'
 #!/bin/sh
@@ -180,6 +175,54 @@ EOF
   chmod +x "${POLICY_RC_PATH}"
   transaction_log "create_file" "${POLICY_RC_PATH}" "rm -f '${POLICY_RC_PATH}'"
   log_info "policy-rc.d shim installed successfully"
+}
+
+# Install a shim for invoke-rc.d to avoid dash parsing errors in containers
+system_prep_install_invoke_rc_shim() {
+  if ! validator_is_container; then
+    log_debug "Not running in a container, skipping invoke-rc.d shim"
+    return 0
+  fi
+
+  local invoke_rc_path="/usr/sbin/invoke-rc.d"
+  local invoke_rc_real_path="/usr/sbin/invoke-rc.d.real"
+  local invoke_rc_orig_path="/usr/sbin/invoke-rc.d.orig"
+
+  if [[ ! -x "${invoke_rc_path}" && ! -x "${invoke_rc_real_path}" ]]; then
+    log_warning "invoke-rc.d not found; skipping shim installation"
+    return 0
+  fi
+
+  # Preserve the original binary once
+  if [[ -x "${invoke_rc_real_path}" && ! -x "${invoke_rc_orig_path}" ]]; then
+    mv "${invoke_rc_real_path}" "${invoke_rc_orig_path}"
+  fi
+
+  # If invoke-rc.d still exists and is not our stub, preserve it
+  if [[ -x "${invoke_rc_path}" && ! -x "${invoke_rc_real_path}" && "$(head -n1 "${invoke_rc_path}")" != "#!/bin/bash" ]]; then
+    mv "${invoke_rc_path}" "${invoke_rc_orig_path}" 2>/dev/null || true
+  fi
+
+  cat >"${invoke_rc_path}" <<'EOF'
+#!/bin/bash
+# invoke-rc.d shim for container provisioning
+# Bypass upstream dash parsing issues by short-circuiting service invocations in containers.
+exit 0
+EOF
+
+  chmod +x "${invoke_rc_path}"
+  transaction_log "create_file" "${invoke_rc_path}" "rm -f '${invoke_rc_path}' && mv '${invoke_rc_orig_path}' '${invoke_rc_path}'"
+
+  # Also stub invoke-rc.d.real so packages calling it directly do not fail
+  cat >"${invoke_rc_real_path}" <<'EOF'
+#!/bin/bash
+# invoke-rc.d.real shim for container provisioning
+exit 0
+EOF
+  chmod +x "${invoke_rc_real_path}"
+  transaction_log "create_file" "${invoke_rc_real_path}" "rm -f '${invoke_rc_real_path}' && mv '${invoke_rc_orig_path}' '${invoke_rc_real_path}'"
+
+  log_info "invoke-rc.d shim installed successfully (stubbed invoke-rc.d and invoke-rc.d.real)"
 }
 
 # Update APT package lists
@@ -561,6 +604,9 @@ system_prep_execute() {
   
   # Install policy-rc.d shim in containers to allow package-triggered service starts
   system_prep_install_policy_rc_shim
+
+  # Install invoke-rc.d shim to prevent shell operator errors in containers
+  system_prep_install_invoke_rc_shim
 
   # Update package lists
   if ! system_prep_update_apt; then

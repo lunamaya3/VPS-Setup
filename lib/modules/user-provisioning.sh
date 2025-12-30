@@ -441,6 +441,13 @@ if [ -f ~/.profile ]; then
   . ~/.profile
 fi
 
+# Force landscape orientation for all connected outputs when available
+if command -v xrandr >/dev/null 2>&1; then
+  for output in $(xrandr --query | awk '/ connected/{print $1}'); do
+    xrandr --output "$output" --rotate normal || true
+  done
+fi
+
 # Start XFCE desktop
 exec startxfce4
 EOF
