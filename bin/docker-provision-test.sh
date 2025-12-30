@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+# Enable BuildKit for advanced Dockerfile features (e.g., cache mounts)
+: "${DOCKER_BUILDKIT:=1}"
+export DOCKER_BUILDKIT
+
 # ============================================
 # Configuration & Constants
 # ============================================
@@ -34,6 +38,7 @@ LOG_DIR="${PROJECT_ROOT}/logs"
 LOG_FILE="${LOG_DIR}/docker-test-${TIMESTAMP}.log"
 BUILD_LOG="${LOG_DIR}/docker-test-${TIMESTAMP}-build.log"
 PROVISION_LOG="${LOG_DIR}/docker-test-${TIMESTAMP}-provision.log"
+PROVISION_ARGS=(--log-level DEBUG --skip-validation --dry-run --yes)
 
 # Docker settings
 IMAGE_NAME="vps-provision"
@@ -383,18 +388,18 @@ run_provisioning() {
     fi
     
     # Execute provisioning script
-    log_phase "PROVISION" "→ Executing: /bin/vps-provision --log-level DEBUG"
+    log_phase "PROVISION" "→ Executing: /bin/vps-provision ${PROVISION_ARGS[*]}"
     
     if [[ "${QUIET_MODE}" == "false" ]]; then
         # Stream to console and log file
         docker exec ${tty_flag} "${CONTAINER_NAME}" \
-            /bin/vps-provision --log-level DEBUG \
+            /bin/vps-provision "${PROVISION_ARGS[@]}" \
             2>&1 | tee -a "${PROVISION_LOG}"
         local exit_code=${PIPESTATUS[0]}
     else
         # Log to file only
         docker exec "${CONTAINER_NAME}" \
-            /bin/vps-provision --log-level DEBUG \
+            /bin/vps-provision "${PROVISION_ARGS[@]}" \
             > "${PROVISION_LOG}" 2>&1
         local exit_code=$?
     fi

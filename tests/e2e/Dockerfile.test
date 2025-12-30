@@ -1,0 +1,118 @@
+# syntax=docker/dockerfile:1
+# Isolated Test Environment for VPS Provisioning Tool
+# Multi-stage build with security hardening and optimization
+# Provides safe, containerized Debian 13 environment matching production VPS specs
+
+# ============================================
+# Stage 1: Build dependencies (cached layer)
+# ============================================
+FROM debian:13 AS base
+
+# Prevent interactive prompts during build
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# Install system dependencies with optimized layer caching
+# Combine update + install + cleanup in single layer to minimize image size
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        sudo \
+        systemd \
+        systemd-sysv \
+        wget \
+        curl \
+        gnupg2 \
+        git \
+        make \
+        procps \
+        jq \
+        python3 \
+        rsync \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# ============================================
+# Stage 2: Install test framework
+# ============================================
+FROM base AS test-tools
+
+# Install bats-core for shell testing
+# Using specific version for reproducibility
+ARG BATS_VERSION=1.10.0
+
+RUN set -euxo pipefail \
+    && cd /tmp \
+    && wget --no-check-certificate -O bats.tar.gz "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" \
+    && tar -xzf bats.tar.gz \
+    && cd bats-core-${BATS_VERSION} \
+    && ./install.sh /usr/local \
+    && cd / \
+    && rm -rf /tmp/bats-core-${BATS_VERSION} /tmp/bats.tar.gz
+
+# ============================================
+# Stage 3: Security hardening & user setup
+# ============================================
+FROM test-tools AS final
+
+# Security: Create non-root test user with minimal privileges
+# Follows principle of least privilege
+ARG UID=10001
+ARG GID=10001
+RUN groupadd -g ${GID} testuser && \
+    useradd -u ${UID} -g ${GID} -m -s /bin/bash testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/testuser && \
+    chmod 0440 /etc/sudoers.d/testuser
+
+# Prepare systemd environment for service testing
+# Multi-user target sufficient for headless testing
+RUN systemctl set-default multi-user.target
+
+# Create provisioning directories with proper ownership
+# Isolated from host filesystem for complete containment
+RUN mkdir -p /var/vps-provision/checkpoints \
+             /var/vps-provision/transactions \
+             /var/vps-provision/locks \
+             /var/log/vps-provision && \
+    chown -R testuser:testuser /var/vps-provision /var/log/vps-provision && \
+    chmod 755 /var/vps-provision /var/log/vps-provision
+
+# Security: Create read-only mount point for project
+# Prevents container modifications to source code
+RUN mkdir -p /provisioning && \
+    chown root:root /provisioning && \
+    chmod 755 /provisioning
+
+# Copy project files into the container
+COPY --chown=root:root . /provisioning/
+
+# Create symlink for vps-provision in /bin for easy access
+RUN chmod +x /provisioning/bin/vps-provision && \
+    ln -sf /provisioning/bin/vps-provision /bin/vps-provision
+
+# Security labels and metadata
+LABEL org.opencontainers.image.title="VPS Provisioning Test Environment" \
+      org.opencontainers.image.description="Isolated Debian 13 container for safe VPS provisioning testing" \
+      org.opencontainers.image.vendor="VPS Provision Team" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.base.name="debian:13" \
+      security.isolation.level="enhanced" \
+      test.framework="bats-core-${BATS_VERSION}"
+
+# Set working directory
+WORKDIR /provisioning
+
+# Health check to ensure systemd is responsive
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD systemctl is-system-running --wait || exit 1
+
+# Use systemd as init for proper service management testing
+# Required for testing services like xrdp, ssh, etc.
+VOLUME ["/sys/fs/cgroup"]
+STOPSIGNAL SIGRTMIN+3
+
+# Run as root initially for systemd, container exec will use testuser
+USER root
+CMD ["/sbin/init"]
