@@ -43,6 +43,17 @@ readonly CERT_FILE="${CERT_FILE:-${XRDP_CONF_DIR}/cert.pem}"
 readonly KEY_FILE="${KEY_FILE:-${XRDP_CONF_DIR}/key.pem}"
 : "${RDP_PORT:=3389}"  # Set default if not already set
 : "${SSH_PORT:=22}"  # Set default if not already set
+: "${XRDP_SECURITY_LAYER:=negotiate}"
+: "${XRDP_CRYPT_LEVEL:=high}"
+: "${XRDP_MAX_BPP:=32}"
+: "${XRDP_FASTPATH:=both}"
+: "${XRDP_BULK_COMPRESS:=true}"
+: "${XRDP_BITMAP_CACHE:=true}"
+: "${XRDP_BITMAP_COMPRESSION:=true}"
+: "${XRDP_SESSIONS_MAX:=50}"
+: "${XRDP_IDLE_TIMEOUT:=3600}"            # seconds
+: "${XRDP_DISCONNECTED_TIMEOUT:=900}"     # seconds
+: "${XRDP_LISTEN_ADDRESS:=0.0.0.0}"
 
 # rdp_server_check_prerequisites
 # Validates system is ready for RDP server installation
@@ -231,15 +242,19 @@ fork=true
 port=${RDP_PORT}
 tcp_nodelay=true
 tcp_keepalive=true
-security_layer=negotiate
-crypt_level=high
+security_layer=${XRDP_SECURITY_LAYER}
+crypt_level=${XRDP_CRYPT_LEVEL}
 certificate=${CERT_FILE}
 key_file=${KEY_FILE}
 ssl_protocols=TLSv1.2, TLSv1.3
-max_bpp=32
+max_bpp=${XRDP_MAX_BPP}
+bulk_compression=${XRDP_BULK_COMPRESS}
+bitmap_cache=${XRDP_BITMAP_CACHE}
+bitmap_compression=${XRDP_BITMAP_COMPRESSION}
 new_cursors=true
-use_fastpath=both
+use_fastpath=${XRDP_FASTPATH}
 autorun=
+listen_address=${XRDP_LISTEN_ADDRESS}
 
 [Logging]
 LogFile=/var/log/xrdp.log
@@ -304,11 +319,11 @@ AlwaysGroupCheck=false
 
 [Sessions]
 X11DisplayOffset=10
-MaxSessions=50
+MaxSessions=${XRDP_SESSIONS_MAX}
 KillDisconnected=false
-; SEC-016: Session timeout - 60 minutes (3600 seconds) idle timeout
-IdleTimeLimit=3600
-DisconnectedTimeLimit=0
+; SEC-016: Session timeout
+IdleTimeLimit=${XRDP_IDLE_TIMEOUT}
+DisconnectedTimeLimit=${XRDP_DISCONNECTED_TIMEOUT}
 Policy=Default
 
 [Logging]
