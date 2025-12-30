@@ -36,16 +36,16 @@ verification_check_services() {
     services_ok=false
   fi
 
-  # Check lightdm service (non-critical in container environments)
+  # Check lightdm service (non-critical; often inactive on headless/container)
   if systemctl is-active --quiet lightdm; then
     log_info "✓ lightdm service is running"
   else
     if is_container_env; then
       log_info "lightdm service is not running (expected in container environments)"
     else
-      log_warning "lightdm service is not running"
+      log_info "lightdm service is not running (desktop may start on first login)"
     fi
-    # Don't fail verification - lightdm may not run in containers
+    # Don't fail verification - lightdm may not run in containers/headless setups
   fi
 
   # Check sshd service
