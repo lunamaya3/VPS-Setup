@@ -160,8 +160,8 @@ autologin-guest=false
 autologin-user-timeout=0
 allow-guest=false
 
-# Performance optimizations
-xserver-command=X -core
+# Performance optimizations for RDP workstation
+xserver-command=X -core -nolisten tcp -dpi 96
 EOF
 
   transaction_log "rm -f ${LIGHTDM_CONF}"
@@ -190,6 +190,7 @@ desktop_env_apply_customizations() {
   mkdir -p "${XFCE_CONFIG_DIR}/xfconf/xfce-perchannel-xml"
   mkdir -p "${XFCE_CONFIG_DIR}/terminal"
   mkdir -p "${XFCE_CONFIG_DIR}/panel"
+  mkdir -p "${XFCE_CONFIG_DIR}/xfce4-power-manager"
 
   # Apply panel customization
   if [[ -f "${DESKTOP_CONFIG_SOURCE}/xfce4-panel.xml" ]]; then
@@ -214,6 +215,43 @@ desktop_env_apply_customizations() {
   else
     log_warning "Theme settings file not found, using defaults"
   fi
+
+  # Create optimized XFCE4 window manager config for RDP
+  cat >"${XFCE_CONFIG_DIR}/xfconf/xfce-perchannel-xml/xfwm4.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="theme" type="string" value="Default"/>
+    <property name="titleless_maximize" type="bool" value="true"/>
+    <property name="box_move" type="bool" value="false"/>
+    <property name="box_resize" type="bool" value="false"/>
+    <property name="show_popup_shadow" type="bool" value="false"/>
+    <property name="snap_to_border" type="bool" value="true"/>
+    <property name="snap_to_windows" type="bool" value="false"/>
+    <property name="workspace_count" type="int" value="2"/>
+    <property name="use_compositing" type="bool" value="false"/>
+    <property name="placement_mode" type="string" value="center"/>
+  </property>
+</channel>
+EOF
+
+  # Create power manager config to prevent screen blanking
+  cat >"${XFCE_CONFIG_DIR}/xfconf/xfce-perchannel-xml/xfce4-power-manager.xml" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-power-manager" version="1.0">
+  <property name="xfce4-power-manager" type="empty">
+    <property name="blank-on-ac" type="int" value="0"/>
+    <property name="blank-on-battery" type="int" value="0"/>
+    <property name="dpms-enabled" type="bool" value="false"/>
+    <property name="dpms-on-ac-off" type="int" value="0"/>
+    <property name="dpms-on-ac-sleep" type="int" value="0"/>
+    <property name="dpms-on-battery-off" type="int" value="0"/>
+    <property name="dpms-on-battery-sleep" type="int" value="0"/>
+    <property name="lock-screen-suspend-hibernate" type="bool" value="false"/>
+    <property name="presentation-mode" type="bool" value="true"/>
+  </property>
+</channel>
+EOF
 
   # Set permissions
   chmod -R 644 "${XFCE_CONFIG_DIR}"

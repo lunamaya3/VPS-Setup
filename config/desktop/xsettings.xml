@@ -19,7 +19,7 @@
     <property name="DPI" type="int" value="96"/>
     <property name="Antialias" type="int" value="1"/>
     <property name="Hinting" type="int" value="1"/>
-    <property name="HintStyle" type="string" value="hintslight"/>
+    <property name="HintStyle" type="string" value="hintfull"/>
     <property name="RGBA" type="string" value="rgb"/>
     <property name="Lcdfilter" type="string" value="lcddefault"/>
   </property>
@@ -28,7 +28,7 @@
     <property name="ColorPalette" type="string" value="black:white:gray50:red:purple:blue:light blue:green:yellow:orange:lavender:brown:goldenrod4:dodger blue:pink:light green:gray10:gray30:gray75:gray90"/>
     <property name="FontName" type="string" value="Sans 10"/>
     <property name="MonospaceFontName" type="string" value="Monospace 10"/>
-    <property name="IconSizes" type="string" value="gtk-menu=16,16:gtk-button=16,16:gtk-small-toolbar=16,16:gtk-large-toolbar=24,24"/>
+    <property name="IconSizes" type="string" value="gtk-menu=16,16:gtk-button=20,20:gtk-small-toolbar=20,20:gtk-large-toolbar=24,24"/>
     <property name="KeyThemeName" type="string" value=""/>
     <property name="ToolbarStyle" type="string" value="icons"/>
     <property name="ToolbarIconSize" type="int" value="3"/>
